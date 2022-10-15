@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/redaphid/sci-fi-name-generator/issues"
   },
-  "homepage": "https://github.com/redaphid/sci-fi-name-generator#readme"
+  "homepage": "https://github.com/redaphid/sci-fi-name-generator#readme",
+  "devDependencies": {
+    "jsdom": "^20.0.1",
+    "node-fetch": "^3.2.10"
+  }
 }
