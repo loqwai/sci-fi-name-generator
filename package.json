@@ -4,8 +4,9 @@
   "description": "Hopefully will generate sci-fi sounding company names",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "get-books": "./scripts/get-sci-fi-corpus.js"
   },
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/redaphid/sci-fi-name-generator.git"
@@ -19,5 +20,8 @@
   "devDependencies": {
     "jsdom": "^20.0.1",
     "node-fetch": "^3.2.10"
+  },
+  "dependencies": {
+    "filenamify-url": "^3.0.0"
   }
 }
