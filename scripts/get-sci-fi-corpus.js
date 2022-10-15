@@ -2,7 +2,7 @@
 
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
-import {existsSync, writeFileSync } from 'fs'
+import {existsSync, readFileSync, writeFileSync } from 'fs'
 import filenamifyUrl from 'filenamify-url';
 
 const phillipKDick = "https://www.gutenberg.org/ebooks/author/33399/"
@@ -25,7 +25,7 @@ async function getBookListHtml(baseUrl) {
 async function getBookList(baseUrl) {
     const html = await getBookListHtml(baseUrl)
     const dom = new JSDOM(html)
-    const lElems = dom.window.document.querySelectorAll('.results')
+    const lElems = dom.window.document.querySelectorAll('.results li')
     const links = []
     lElems.forEach(console.log)
     return links
