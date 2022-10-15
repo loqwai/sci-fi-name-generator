@@ -25,9 +25,14 @@ async function getBookListHtml(baseUrl) {
 async function getBookList(baseUrl) {
     const html = await getBookListHtml(baseUrl)
     const dom = new JSDOM(html)
-    const lElems = dom.window.document.querySelectorAll('.results li')
-    const links = []
-    lElems.forEach(console.log)
+    const lElems = dom.window.document.querySelectorAll('.results li a')
+    let links = []
+    lElems.forEach(l => links.push(l.getAttribute('href')))
+    console.log('links',links)
+    const bookUrlRegex = new RegExp(/ebooks\/[0-9]+/)
+    links = links.filter(l => bookUrlRegex.test(l))
+    links = links.map(l => `https://www.gutenberg.org${l}`)
+    console.log('links', links)
     return links
 }
 
