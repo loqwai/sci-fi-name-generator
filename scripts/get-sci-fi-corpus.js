@@ -51,11 +51,12 @@ const getBookText = async (url) => {
     const html = await getBookHtml(url)
     const dom = new JSDOM(html)
     const lElems = dom.window.document.querySelectorAll('a[type="text/plain"]')
+    if (lElems.length !== 1) throw new Error(`no plain text link for ${url}`)
     let links = []
-    console.log(lElems.length)
     lElems.forEach(l => links.push(l.getAttribute('href')))
-    console.log({links})
-    return ''
+    links = links.map(l => `https://www.gutenberg.org${l}`)
+    console.log(links[0])
+    return links[0]
 }
 async function getScript(url) {
     url = baseUrl + url
