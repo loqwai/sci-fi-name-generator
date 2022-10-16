@@ -39,7 +39,7 @@ const getBookHtml = async (url) => {
     const safeName = filenamifyUrl(url)
     if (existsSync(`tmp/${safeName}.html`)) {
         console.log('book html existed')
-        return await readFile(`tmp/${safeName}.txt`, 'utf8')
+        return await readFile(`tmp/${safeName}.html`, 'utf8')
     }
     console.log('crawling new book html')
     const res = await fetch(url)
@@ -49,8 +49,13 @@ const getBookHtml = async (url) => {
 
 const getBookText = async (url) => {
     const html = await getBookHtml(url)
-    console.log({html})
-    return html
+    const dom = new JSDOM(html)
+    const lElems = dom.window.document.querySelectorAll('a[type="text/plain"]')
+    let links = []
+    console.log(lElems.length)
+    lElems.forEach(l => links.push(l.getAttribute('href')))
+    console.log({links})
+    return ''
 }
 async function getScript(url) {
     url = baseUrl + url
