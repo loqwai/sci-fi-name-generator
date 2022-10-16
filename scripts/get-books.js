@@ -84,4 +84,5 @@ async function getBooks(bookShelfUrl) {
     // return await Promise.all(promises)
 }
 
-getBooks(phillipKDick)
+const bookShelfUrl =  '' //TODO: pass this in from the cli
+getBooks(bookShelfUrl || phillipKDick)

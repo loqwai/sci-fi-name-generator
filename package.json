@@ -4,7 +4,7 @@
   "description": "Hopefully will generate sci-fi sounding company names",
   "main": "index.js",
   "scripts": {
-    "get-books": "./scripts/get-sci-fi-corpus.js"
+    "get-books": "./scripts/get-books.js"
   },
   "type": "module",
   "repository": {
