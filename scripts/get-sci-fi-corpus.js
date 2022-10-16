@@ -44,10 +44,11 @@ const getBookHtml = async (url) => {
     console.log('crawling new book html')
     const res = await fetch(url)
     const text = await res.text()
-    await writeFile(`tmp/${safeName}.html`, text, 'utf8')
+    writeFile(`tmp/${safeName}.html`, text, 'utf8')
+    return text
 }
 
-const getBookText = async (url) => {
+const getBookTextUrl = async (url) => {
     const html = await getBookHtml(url)
     const dom = new JSDOM(html)
     const lElems = dom.window.document.querySelectorAll('a[type="text/plain"]')
@@ -58,23 +59,26 @@ const getBookText = async (url) => {
     console.log(links[0])
     return links[0]
 }
-async function getScript(url) {
-    url = baseUrl + url
-    const res = await fetch(url)
+
+const getBookText = async(url) =>{
+    const textUrl = await getBookTextUrl(url)
+    console.log({textUrl})
+    const safeName = filenamifyUrl(textUrl)
+    if (existsSync(`tmp/${safeName}.txt`)) {
+        console.log('book txt existed')
+        return await readFile(`tmp/${safeName}.txt`, 'utf8')
+    }
+    console.log('crawling new book txt')
+    const res = await fetch(textUrl)
     const text = await res.text()
-    const dom = new JSDOM(text)
-    const script = dom.window.document.querySelector('.scrolling-script-container').textContent
-    console.log(script.replace(/\|/gi, '\n'))
-    return script
+    writeFile(`tmp/${safeName}.txt`, text, 'utf8')
+    return text
 }
-// async function getScripts() {
-//     const script = await getScript(url)
-//     console.log("gs",script)
-//     return script
-// }
 async function getBooks() {
     const bookList = await getBookList(phillipKDick)
+    console.log({bookList})
     const bookTexts = await Promise.all(bookList.map(getBookText))
+    console.log(bookTexts)
     // return await Promise.all(promises)
 }
 
