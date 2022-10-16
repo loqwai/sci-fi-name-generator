@@ -6,32 +6,33 @@ import { existsSync, readFileSync, writeFileSync} from 'fs'
 import {readFile, writeFile } from 'fs/promises'
 import filenamifyUrl from 'filenamify-url';
 
+const baseUrl = 'https://www.gutenberg.org'
 const phillipKDick = "https://www.gutenberg.org/ebooks/author/33399/"
-
-async function getBookListHtml(baseUrl) {
-    if (!baseUrl) throw new Error("no baseUrl")
-    const safeName = filenamifyUrl(baseUrl)
+// const
+async function getBookListHtml(bookIndexUrl) {
+    if (!bookIndexUrl) throw new Error("no baseUrl")
+    const safeName = filenamifyUrl(bookIndexUrl)
 
     if (existsSync(`tmp/${safeName}.html`)) {
         console.log('html existed')
         return readFileSync(`tmp/${safeName}.html`, 'utf8')
     }
     console.log('crawling new html')
-    const res = await fetch(baseUrl)
+    const res = await fetch(bookIndexUrl)
     const text = await res.text()
     console.log(text)
     writeFileSync(`tmp/${safeName}.html`, text, 'utf8')
     return text
 }
-async function getBookList(baseUrl) {
-    const html = await getBookListHtml(baseUrl)
+async function getBookList(bookshelfUrl) {
+    const html = await getBookListHtml(bookshelfUrl)
     const dom = new JSDOM(html)
     const lElems = dom.window.document.querySelectorAll('.results li a')
     let links = []
     lElems.forEach(l => links.push(l.getAttribute('href')))
     const bookUrlRegex = new RegExp(/ebooks\/[0-9]+/)
     links = links.filter(l => bookUrlRegex.test(l))
-    links = links.map(l => `https://www.gutenberg.org${l}`)
+    links = links.map(l => `${baseUrl}/${l}`)
     return links
 }
 
@@ -55,7 +56,7 @@ const getBookTextUrl = async (url) => {
     if (lElems.length !== 1) throw new Error(`no plain text link for ${url}`)
     let links = []
     lElems.forEach(l => links.push(l.getAttribute('href')))
-    links = links.map(l => `https://www.gutenberg.org${l}`)
+    links = links.map(l => `${baseUrl}${l}`)
     console.log(links[0])
     return links[0]
 }
