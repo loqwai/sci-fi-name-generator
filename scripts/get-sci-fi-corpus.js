@@ -75,12 +75,13 @@ const getBookText = async(url) =>{
     writeFile(`tmp/${safeName}.txt`, text, 'utf8')
     return text
 }
-async function getBooks() {
-    const bookList = await getBookList(phillipKDick)
+async function getBooks(bookShelfUrl) {
+    if(!bookShelfUrl) throw new Error('I need to know where to begin crawling')
+    const bookList = await getBookList(bookShelfUrl)
     console.log({bookList})
     const bookTexts = await Promise.all(bookList.map(getBookText))
     console.log(bookTexts)
     // return await Promise.all(promises)
 }
 
-getBooks()
+getBooks(phillipKDick)
