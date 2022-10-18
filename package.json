@@ -5,9 +5,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "get-books": "./scripts/get-books.js"
+    "get-books": "./scripts/get-books.js",
+    "test": "node --experimental-vm-modules ./node_modules/.bin/jest"
   },
-  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/redaphid/sci-fi-name-generator.git"
@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/redaphid/sci-fi-name-generator#readme",
   "devDependencies": {
+    "jest": "^29.2.1",
     "jsdom": "^20.0.1",
     "node-fetch": "^3.2.10"
   },
