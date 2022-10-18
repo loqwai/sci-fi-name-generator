@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Hopefully will generate sci-fi sounding company names",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "get-books": "./scripts/get-books.js"
   },
