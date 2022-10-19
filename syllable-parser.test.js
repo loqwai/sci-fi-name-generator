@@ -1,17 +1,24 @@
-import {syllabify} from './syllable-parser.js'
+import {getSyllables} from './syllable-parser.js'
 
 
-describe('syllabify', () => {
+describe('getSyllables', () => {
   it('should return an array of syllables', () => {
     const words = 'syllable'
-    const syllables = syllabify(words).sort()
+    const syllables = getSyllables(words).sort()
     expect(syllables).toEqual(['syl', 'lab', 'le'].sort())
   })
 
   describe("When the word has capital letters", () => {
     it('should return an array of lower-case syllables', () => {
       const words = 'Syllable'
-      const syllables = syllabify(words).sort()
+      const syllables = getSyllables(words).sort()
+      expect(syllables).toEqual(['syl', 'lab', 'le'].sort())
+    })
+  })
+  describe("When the word has a hyphen", () => {
+    it('should return an array of syllables', () => {
+      const words = 'syll-able'
+      const syllables = getSyllables(words).sort()
       expect(syllables).toEqual(['syl', 'lab', 'le'].sort())
     })
   })
