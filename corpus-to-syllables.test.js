@@ -17,7 +17,6 @@ describe('corpusToSyllables', () => {
         directorySyllables = await corpusToSyllables(path)
       })
       it('should return an array of syllables that is larger than the single file', () => {
-        // console.log({directorySyllables})
         expect(directorySyllables.length).toBeGreaterThan(singleFileSyllables.length)
       })
     })
