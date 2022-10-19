@@ -5,4 +5,3 @@ export const getSyllables = (word) => {
   word = removeNonLetters(word)
   return word.match(syllableRegex).map(syllable => syllable.toLowerCase())
 }
-export default getSyllables
