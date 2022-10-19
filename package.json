@@ -25,5 +25,8 @@
   },
   "dependencies": {
     "filenamify-url": "^3.0.0"
+  },
+  "engines":{
+    "node": ">=19.0.0"
   }
 }

@@ -1,4 +1,4 @@
-import {readFile,stat} from 'fs/promises'
+import {readFile,stat, readdir} from 'fs/promises'
 import {getSyllables} from './syllable-parser'
 
 const corpusToSyllables = async (path) => {
