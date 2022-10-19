@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "get-books": "./scripts/get-books.js",
+    "get-books": "./get-books.js",
     "test": "node --experimental-vm-modules ./node_modules/.bin/jest"
   },
   "repository": {
