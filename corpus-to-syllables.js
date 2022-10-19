@@ -1,24 +1,20 @@
 import {readFile,stat, readdir} from 'fs/promises'
 import {getSyllables} from './syllable-parser'
+import {join} from 'path'
 
 const corpusToSyllables = async (path) => {
-  console.log('corpusToSyllables', {path})
   const stats = await stat(path)
 
   if (stats.isFile()) return await syllablesInFile(path)
   if (stats.isDirectory()) {
-    console.log('is directory')
     const files = await readdir(path)
-    const syllables = files.map(f => syllablesInFile(f))
-    return syllables
-  }
+    const syllablesPerFile = await Promise.all(files.map(f => syllablesInFile(join(path,f))))
+    return syllablesPerFile.flat()  }
 }
 
 const syllablesInFile = async (path) => {
-  console.log('syllablesInFile', {path})
   const text = await readFile(path, 'utf8')
   const syllables = getSyllables(text)
-  console.log('syllables', {syllables})
   return syllables
 }
 
