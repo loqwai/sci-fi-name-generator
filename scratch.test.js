@@ -57,16 +57,18 @@ describe('When using the test harness to run the program', () => {
   describe('when curious about word sets between authors', () => {
     let words
     describe("when we read the words from all the authors", () => {
-      let phillipWords, janeWords, asimovWords, bramWords
+      let phillipWords, janeWords, asimovWords, bramWords,lovecraftWords
       beforeAll(async () => {
         const phillipPath = './data/phillip_k_dick'
         const janePath = './data/jane_austin'
         const asimovPath = './data/asimov'
         const bramPath = './data/bram_stoker'
+        const lovecraftPath = './data/lovecraft'
         phillipWords = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
         janeWords = await wordsInCorpus(janePath)
         asimovWords = await wordsInCorpus(asimovPath)
         bramWords = await wordsInCorpus(bramPath)
+        lovecraftWords = await wordsInCorpus(lovecraftPath)
       })
       describe('when you want some examples of how to use the word sets', () => {
         describe('when finding words unique to asimov', () => {
@@ -127,11 +129,10 @@ describe('When using the test harness to run the program', () => {
           let syllables
           beforeEach(() => {
             words = difference(
-              bramWords,
-              asimovWords,
-              phillipWords,
-              janeWords,
+              intersect(lovecraftWords,asimovWords),
+              intersect(janeWords,asimovWords,bramWords,phillipWords),
             ).sort()
+
             syllables = words.map(word => getSyllables(word)).flat()
           })
           it('should return hopefully more interesting words', () => {

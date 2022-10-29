@@ -12,6 +12,7 @@ const janeAusten = "https://www.gutenberg.org/ebooks/author/1544"
 const asimov = "https://www.gutenberg.org/ebooks/author/35316"
 const bramStoker = "https://www.gutenberg.org/ebooks/author/190"
 const lovecraft = "https://www.gutenberg.org/ebooks/author/34724"
+const top100 = 'https://www.gutenberg.org/browse/scores/top'
 // const
 async function getBookListHtml(bookIndexUrl) {
     if (!bookIndexUrl) throw new Error("no baseUrl")
@@ -31,7 +32,7 @@ async function getBookListHtml(bookIndexUrl) {
 async function getBookList(bookshelfUrl) {
     const html = await getBookListHtml(bookshelfUrl)
     const dom = new JSDOM(html)
-    const lElems = dom.window.document.querySelectorAll('.results li a')
+    const lElems = dom.window.document.querySelectorAll('li a')
     let links = []
     lElems.forEach(l => links.push(l.getAttribute('href')))
     const bookUrlRegex = new RegExp(/ebooks\/[0-9]+/)
@@ -93,4 +94,4 @@ async function getBooks(bookShelfUrl) {
 }
 
 const bookShelfUrl = '' //TODO: pass this in from the cli
-getBooks(bookShelfUrl || lovecraft)
+getBooks(bookShelfUrl || top100)
