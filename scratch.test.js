@@ -1,5 +1,6 @@
 import { corpusToSyllables } from './corpus-to-syllables.js'
 import { wordsInCorpus } from './corpus-to-syllables.js'
+import {getSyllables} from './syllable-parser.js'
 
 import { writeFileSync } from 'fs'
 import pronounceable from 'pronounceable'
@@ -16,6 +17,16 @@ const wordFromSyllables = (syllables) => {
     return syllables[syllableIndex]
   })
   return word.join('')
+}
+
+const generateWords = (syllables, count=100,minWordLength=5) => {
+  console.log({syllables})
+  const words = new Array(count)
+    .fill(0)
+    .map(() => wordFromSyllables(syllables))
+    .filter(w => w.length >= minWordLength)
+    .filter(pronounceable.test)
+  return words
 }
 
 const intersect = (...sets) => {
@@ -96,7 +107,7 @@ describe('When using the test harness to run the program', () => {
             expect(janeIntersection.length).toBe(words.length)
           })
         })
-        describe('wait, did Phillip and Asimov both reference detroit?', () => {
+        describe('wait, did Phillip and Asimov both reference Detroit?', () => {
           it('should apparently be true', () => {
             expect(phillipWords.includes('detroit')).toBe(true)
             expect(asimovWords.includes('detroit')).toBe(true)
@@ -106,25 +117,27 @@ describe('When using the test harness to run the program', () => {
               words = difference(
                 intersect(asimovWords, phillipWords),
                 janeWords,
-              ).sort()
+              )
             })
             it('should return an array of words', () => {
               expect(words.length).toBeLessThan(asimovWords.length)
-              // console.log({ theScarletLetterWasTerrible: words })
+              // console.log(JSON.stringify(words,null,2))
             })
           })
         })
         describe('a scratchpad for testing out these things', () => {
+          let syllables
           beforeEach(() => {
             words = join(
               phillipWords,
               janeWords,
               asimovWords,
-            ).sort()
+            )
+            syllables = words.map(word => getSyllables(word)).flat()
           })
           it('should return an array of words', () => {
             expect(words.length).toBeGreaterThan(0)
-            // console.log({ words })
+            console.log({syllables})
           })
         })
       })
@@ -149,10 +162,8 @@ describe('When using the test harness to run the program', () => {
     })
     it('should return an array of syllables', () => {
       expect(syllables.length).toBeGreaterThan(5)
-      const manyWords = new Array(100).fill(0).map(() => wordFromSyllables(syllables))
-      const wordsLongerThan5 = manyWords.filter(word => word.length > 5)
-      const pronounceableWords = wordsLongerThan5.filter(pronounceable.test)
-      // console.log(pronounceableWords.join('\n'))
+      const words = generateWords(syllables, 100, 5)
+      console.log(words.join('\n'))
     })
   })
 })
