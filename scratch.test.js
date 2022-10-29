@@ -165,15 +165,8 @@ describe('When using the test harness to run the program', () => {
     })
   })
 })
+//yeah, the sci fi generated syllables are more fun. Didn't do the hard work of tfidf, but it might be good enough
 const okOptions = [
-  'tentani',
-  'valthec',
-  'mareki',
-  'kelrav',
-  'waydir',
-  'ntuntu',
-  'bionrigge',
-  'koichy',
-  'nerpab',
+'tornoromic',
   // 'jetmod', domain in use
 ]
