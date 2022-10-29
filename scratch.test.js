@@ -20,7 +20,6 @@ const wordFromSyllables = (syllables) => {
 }
 
 const generateWords = (syllables, count=100,minWordLength=5) => {
-  console.log({syllables})
   const words = new Array(count)
     .fill(0)
     .map(() => wordFromSyllables(syllables))
