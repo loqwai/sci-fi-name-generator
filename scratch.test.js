@@ -7,7 +7,7 @@ const randomInRange = (min, max) => {
 }
 const wordFromSyllables = (syllables) => {
   const syllableCount = syllables.length
-  const wordLength = randomInRange(1, 4)
+  const wordLength = randomInRange(2, 4)
   const word = new Array(wordLength).fill(0).map(() => {
     const syllableIndex = randomInRange(0, syllableCount - 1)
     return syllables[syllableIndex]
