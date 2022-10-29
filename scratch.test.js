@@ -36,9 +36,7 @@ const difference = (...sets) => {
 
 const join = (...sets) => {
   return [...sets.reduce((a, b) => {
-    const uniqueA = unique(a)
-    const uniqueB = unique(b)
-    return new Set([...uniqueA, ...uniqueB]).values()
+    return new Set([...unique(a), ...unique(b)]).values()
   })]
 }
 
@@ -56,7 +54,11 @@ describe('When using the test harness to run the program', () => {
       const dickWords = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
       const janeWords = await wordsInCorpus(janePath)
       const asimovWords = await wordsInCorpus(asimovPath)
-      words = intersect(dickWords, janeWords, asimovWords)
+
+      words = difference(
+        intersect(dickWords, asimovWords),
+        janeWords,
+      )
     })
     it('should return an array of words', () => {
       expect(words.length).toBeGreaterThan(5)
