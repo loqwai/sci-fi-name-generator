@@ -26,7 +26,8 @@ describe('When using the test harness to run the program', () => {
     it('should return an array of syllables', () => {
       expect(phillipSyllables.length).toBeGreaterThan(5)
       const manyWords = new Array(10).fill(0).map(() => wordFromSyllables(phillipSyllables))
-      console.log(manyWords.join('\n'))
+      const wordsLongerThan5 = manyWords.filter(word => word.length > 5)
+      console.log(wordsLongerThan5.join('\n'))
     })
   })
 })
