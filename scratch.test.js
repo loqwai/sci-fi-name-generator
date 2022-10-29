@@ -1,7 +1,7 @@
 import { corpusToSyllables } from './corpus-to-syllables.js'
 import { wordsInCorpus } from './corpus-to-syllables.js'
 
-import {writeFileSync} from 'fs'
+import { writeFileSync } from 'fs'
 import pronounceable from 'pronounceable'
 
 const randomInRange = (min, max) => {
@@ -19,7 +19,7 @@ const wordFromSyllables = (syllables) => {
 }
 
 const intersect = (...sets) => {
-  return [... sets.reduce((a, b) => {
+  return [...sets.reduce((a, b) => {
     const uniqueA = unique(a)
     const uniqueB = unique(b)
     return new Set([...uniqueA].filter((x) => uniqueB.includes(x))).values()
@@ -47,22 +47,30 @@ const unique = (a) => {
 describe('When using the test harness to run the program', () => {
   describe('when curious about word sets between authors', () => {
     let words
-    beforeEach(async () => {
-      const phillipPath = './data/phillip_k_dick'
-      const janePath = './data/jane_austin'
-      const asimovPath = './data/asimov'
-      const dickWords = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
-      const janeWords = await wordsInCorpus(janePath)
-      const asimovWords = await wordsInCorpus(asimovPath)
+    describe("when we read the words from all the authors", () => {
+      let dickWords, janeWords, asimovWords
+      beforeEach(async () => {
+        const phillipPath = './data/phillip_k_dick'
+        const janePath = './data/jane_austin'
+        const asimovPath = './data/asimov'
+        dickWords = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
+        janeWords = await wordsInCorpus(janePath)
+        asimovWords = await wordsInCorpus(asimovPath)
+      })
+      describe('when we compare the words', () => {
+        beforeEach(() => {
+          words = difference(
+            asimovWords,
+            janeWords,
+            dickWords,
+          ).sort()
+        })
 
-      words = difference(
-        intersect(dickWords, asimovWords),
-        janeWords,
-      )
-    })
-    it('should return an array of words', () => {
-      expect(words.length).toBeGreaterThan(5)
-      console.log({words})
+        it('should return an array of words', () => {
+          expect(words.length).toBeGreaterThan(5)
+          console.log({ words })
+        })
+      })
     })
   })
   describe('when we get all the syllables in asimov, jane, and phillp', () => {
@@ -73,8 +81,8 @@ describe('When using the test harness to run the program', () => {
       const asimovPath = './data/asimov'
 
       const philSyl = unique(await corpusToSyllables(phillipPath))
-      const asimovSyl = unique( await corpusToSyllables(asimovPath))
-      const janeSyl = unique( await corpusToSyllables(janePath))
+      const asimovSyl = unique(await corpusToSyllables(asimovPath))
+      const janeSyl = unique(await corpusToSyllables(janePath))
 
       syllables = difference(philSyl, join(asimovSyl, janeSyl))
 

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "get-books": "./get-books.js",
-    "test": "node --experimental-vm-modules ./node_modules/.bin/jest"
+    "test": "node --experimental-vm-modules ./node_modules/.bin/jest --verbose"
   },
   "repository": {
     "type": "git",
