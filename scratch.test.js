@@ -48,12 +48,12 @@ describe('When using the test harness to run the program', () => {
   describe('when curious about word sets between authors', () => {
     let words
     describe("when we read the words from all the authors", () => {
-      let dickWords, janeWords, asimovWords
+      let phillip, janeWords, asimovWords
       beforeAll(async () => {
         const phillipPath = './data/phillip_k_dick'
         const janePath = './data/jane_austin'
         const asimovPath = './data/asimov'
-        dickWords = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
+        phillip = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
         janeWords = await wordsInCorpus(janePath)
         asimovWords = await wordsInCorpus(asimovPath)
       })
@@ -63,7 +63,7 @@ describe('When using the test harness to run the program', () => {
             words = difference(
               asimovWords,
               janeWords,
-              dickWords,
+              phillip,
             ).sort()
           })
 
@@ -77,7 +77,7 @@ describe('When using the test harness to run the program', () => {
             words = difference(
               janeWords,
               asimovWords,
-              dickWords,
+              phillip,
             ).sort()
           })
           it('should return an array of words', () => {
@@ -87,11 +87,19 @@ describe('When using the test harness to run the program', () => {
             const asimovIntersection = intersect(words, asimovWords)
             expect(asimovIntersection.length).toBe(0)
           })
+          it('should return an array with no words in common with Phillip', () => {
+            const phillipIntersection = intersect(words, phillip)
+            expect(phillipIntersection.length).toBe(0)
+          })
+          it('should return an array that is a subset of the words in Jane', () => {
+            const janeIntersection = intersect(words, janeWords)
+            expect(janeIntersection.length).toBe(words.length)
+          })
         })
-        describe('when finding words both Asimov and Dick wrote, but not Jane', () => {
+        describe('when finding words both Asimov and Phillip wrote, but not Jane', () => {
           beforeEach(() => {
             words = difference(
-              intersect(asimovWords,dickWords),
+              intersect(asimovWords,phillip),
               janeWords,
             ).sort()
           })
@@ -103,7 +111,7 @@ describe('When using the test harness to run the program', () => {
         describe('a scratchpad for testing out these things', () => {
           beforeEach(() => {
             words = join(
-              dickWords,
+              phillip,
               janeWords,
               asimovWords,
             ).sort()
