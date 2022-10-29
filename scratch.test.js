@@ -18,14 +18,16 @@ const wordFromSyllables = (syllables) => {
 describe('When using the test harness to run the program', () => {
   describe('when the path is the phillipkdick folder', () => {
     let phillipSyllables
+    let uniqueSyllables
     beforeEach(async () => {
       const path = './data/phillip_k_dick'
       phillipSyllables = await corpusToSyllables(path)
-      // writeFileSync('./data/phillip_syllables.json', JSON.stringify(phillipSyllables, null, 2))
+      uniqueSyllables = [...new Set(phillipSyllables)]
+      // writeFileSync('./data/phillip_syllables.json', JSON.stringify(uniqueSyllables, null, 2))
     })
     it('should return an array of syllables', () => {
       expect(phillipSyllables.length).toBeGreaterThan(5)
-      const manyWords = new Array(10).fill(0).map(() => wordFromSyllables(phillipSyllables))
+      const manyWords = new Array(10).fill(0).map(() => wordFromSyllables(uniqueSyllables))
       const wordsLongerThan5 = manyWords.filter(word => word.length > 5)
       console.log(wordsLongerThan5.join('\n'))
     })
