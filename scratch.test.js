@@ -16,35 +16,50 @@ const wordFromSyllables = (syllables) => {
   })
   return word.join('')
 }
+
+const intersect = (...sets) => {
+  return [... sets.reduce((a, b) => {
+    return a.filter((value) => b.includes(value))
+  })]
+}
+
+const difference = (...sets) => {
+  return [...sets.reduce((a, b) => {
+    return a.filter((value) => !b.includes(value))
+  })]
+}
+
+const join = (...sets) => {
+  return [...sets.reduce((a, b) => {
+    return new Set([...a, ...b]).values()
+  })]
+}
+
+const unique = (a) => {
+  return [...new Set(a)]
+}
+
 describe('When using the test harness to run the program', () => {
   describe('when the path is the phillipkdick folder', () => {
-    let syllablesShorterThan4
+    let syllables
     beforeEach(async () => {
       const phillipPath = './data/phillip_k_dick'
       const janePath = './data/jane_austin'
       const asimovPath = './data/asimov'
-      const phillipSyllables = await corpusToSyllables(phillipPath)
-      const asimovSyllables = await corpusToSyllables(asimovPath)
-      const janeSyllables = await corpusToSyllables(janePath)
 
-      const uniquePhillipSyllables = [...new Set(phillipSyllables)]
-      const uniqueJaneSyllables = [...new Set(janeSyllables)]
-      const uniqueAsimovSyllables = [...new Set(asimovSyllables)]
+      const philSyl = unique(await corpusToSyllables(phillipPath))
+      const asimovSyl = unique( await corpusToSyllables(asimovPath))
+      const janeSyl = unique( await corpusToSyllables(janePath))
 
-      const uniqueToPhillipSyllables = uniquePhillipSyllables.filter((syllable) => {
-        return !uniqueJaneSyllables.includes(syllable)
-      })
-      const phillipAndAsimovSyllables = uniqueToPhillipSyllables.filter((syllable) => {
-        return uniqueAsimovSyllables.includes(syllable)
-      })
-      console.log(phillipAndAsimovSyllables)
-      syllablesShorterThan4 = phillipAndAsimovSyllables.filter(s => s.length < 4)
+      syllables = intersect(philSyl, difference(janeSyl, asimovSyl))
+
+      syllables = syllables.filter(s => s.length < 4)
       // writeFileSync('./data/jane_syllables.json', JSON.stringify(phillipSyllables, null, 2))
-      console.log(syllablesShorterThan4)
+      console.log(syllables)
     })
     it('should return an array of syllables', () => {
-      expect(syllablesShorterThan4.length).toBeGreaterThan(5)
-      const manyWords = new Array(100).fill(0).map(() => wordFromSyllables(syllablesShorterThan4))
+      expect(syllables.length).toBeGreaterThan(5)
+      const manyWords = new Array(100).fill(0).map(() => wordFromSyllables(syllables))
       const wordsLongerThan5 = manyWords.filter(word => word.length > 5)
       const pronounceableWords = wordsLongerThan5.filter(pronounceable.test)
       console.log(pronounceableWords.join('\n'))
@@ -56,7 +71,7 @@ const okOptions = [
   'valthec',
   'mareki',
   'kelrav',
-  'vappog',
+  'waydir',
   'ntuntu',
   'bionrigge',
   'koichy',
