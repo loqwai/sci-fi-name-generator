@@ -57,18 +57,20 @@ describe('When using the test harness to run the program', () => {
   describe('when curious about word sets between authors', () => {
     let words
     describe("when we read the words from all the authors", () => {
-      let phillipWords, janeWords, asimovWords, bramWords,lovecraftWords
+      let phillipWords, janeWords, asimovWords, bramWords, lovecraftWords, top100Words
       beforeAll(async () => {
         const phillipPath = './data/phillip_k_dick'
         const janePath = './data/jane_austin'
         const asimovPath = './data/asimov'
         const bramPath = './data/bram_stoker'
         const lovecraftPath = './data/lovecraft'
+        const top100Path = './data/top100'
         phillipWords = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
         janeWords = await wordsInCorpus(janePath)
         asimovWords = await wordsInCorpus(asimovPath)
         bramWords = await wordsInCorpus(bramPath)
         lovecraftWords = await wordsInCorpus(lovecraftPath)
+        top100Words = await wordsInCorpus(top100Path)
       })
       describe('when you want some examples of how to use the word sets', () => {
         describe('when finding words unique to asimov', () => {
@@ -129,8 +131,8 @@ describe('When using the test harness to run the program', () => {
           let syllables
           beforeEach(() => {
             words = difference(
-              intersect(lovecraftWords,asimovWords),
-              intersect(janeWords,asimovWords,bramWords,phillipWords),
+              intersect(phillipWords, asimovWords),
+              top100Words,
             ).sort()
 
             syllables = words.map(word => getSyllables(word)).flat()
@@ -140,7 +142,7 @@ describe('When using the test harness to run the program', () => {
             expect(interesting).toBe(true)
 
             const generatedWords = generateWords(syllables, 100).sort()
-            console.log(JSON.stringify({words,generatedWords}, null, 2))
+            console.log(JSON.stringify({ words, generatedWords }, null, 2))
             console.log(`we had ${words.length} words, and ${syllables.length} syllables to work with`)
           })
         })
@@ -172,7 +174,7 @@ describe('When using the test harness to run the program', () => {
 })
 //yeah, the sci fi generated syllables are more fun. Didn't do the hard work of tfidf, but it might be good enough
 const okOptions = [
-'tornoromic',
-'quarbet',
+  'tornoromic',
+  'quarbet',
   // 'jetmod', domain in use
 ]
