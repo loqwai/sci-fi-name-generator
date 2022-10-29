@@ -20,12 +20,11 @@ const wordFromSyllables = (syllables) => {
 }
 
 const generateWords = (syllables, count=100,minWordLength=5) => {
-  const words = new Array(count)
+  return new Array(count)
     .fill(0)
     .map(() => wordFromSyllables(syllables))
     .filter(w => w.length >= minWordLength)
     .filter(pronounceable.test)
-  return words
 }
 
 const intersect = (...sets) => {
