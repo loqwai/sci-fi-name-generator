@@ -24,9 +24,10 @@
     "node-fetch": "^3.2.10"
   },
   "dependencies": {
-    "filenamify-url": "^3.0.0"
+    "filenamify-url": "^3.0.0",
+    "pronounceable": "^1.0.1"
   },
-  "engines":{
+  "engines": {
     "node": ">=19.0.0 < 20"
   }
 }

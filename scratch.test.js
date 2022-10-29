@@ -1,5 +1,6 @@
 import { corpusToSyllables } from './corpus-to-syllables.js'
 import {writeFileSync} from 'fs'
+import pronounceable from 'pronounceable'
 
 const randomInRange = (min, max) => {
   // thanks to copilot, that cited the actual source
@@ -37,9 +38,10 @@ describe('When using the test harness to run the program', () => {
     })
     it('should return an array of syllables', () => {
       expect(phillipSyllables.length).toBeGreaterThan(5)
-      const manyWords = new Array(10).fill(0).map(() => wordFromSyllables(syllablesShorterThan4))
+      const manyWords = new Array(100).fill(0).map(() => wordFromSyllables(syllablesShorterThan4))
       const wordsLongerThan5 = manyWords.filter(word => word.length > 5)
-      console.log(wordsLongerThan5.join('\n'))
+      const pronounceableWords = wordsLongerThan5.filter(pronounceable.test)
+      console.log(pronounceableWords.join('\n'))
     })
   })
 })
@@ -48,4 +50,5 @@ const okOptions = [
   'valthec',
   'mareki',
   'kelrav',
+  'vappog',
 ]
