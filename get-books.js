@@ -2,13 +2,15 @@
 
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
-import { existsSync, readFileSync, writeFileSync} from 'fs'
-import {readFile, writeFile } from 'fs/promises'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
 import filenamifyUrl from 'filenamify-url';
 
 const baseUrl = 'https://www.gutenberg.org'
 const phillipKDick = "https://www.gutenberg.org/ebooks/author/33399/"
 const janeAusten = "https://www.gutenberg.org/ebooks/author/1544"
+const asimov = "https://www.gutenberg.org/ebooks/author/35316"
+const bramStoker = "https://www.gutenberg.org/ebooks/author/190"
 // const
 async function getBookListHtml(bookIndexUrl) {
     if (!bookIndexUrl) throw new Error("no baseUrl")
@@ -62,28 +64,32 @@ const getBookTextUrl = async (url) => {
     return links[0]
 }
 
-const getBookText = async(url) =>{
-    const textUrl = await getBookTextUrl(url)
-    console.log({textUrl})
-    const safeName = filenamifyUrl(textUrl)
-    if (existsSync(`tmp/${safeName}.txt`)) {
-        console.log('book txt existed')
-        return await readFile(`tmp/${safeName}.txt`, 'utf8')
+const getBookText = async (url) => {
+    try {
+        const textUrl = await getBookTextUrl(url)
+        console.log({ textUrl })
+        const safeName = filenamifyUrl(textUrl)
+        if (existsSync(`tmp/${safeName}.txt`)) {
+            console.log('book txt existed')
+            return await readFile(`tmp/${safeName}.txt`, 'utf8')
+        }
+        console.log('crawling new book txt')
+        const res = await fetch(textUrl)
+        const text = await res.text()
+        writeFile(`tmp/${safeName}.txt`, text, 'utf8')
+        return text
+    } catch (e) {
+        return ''
     }
-    console.log('crawling new book txt')
-    const res = await fetch(textUrl)
-    const text = await res.text()
-    writeFile(`tmp/${safeName}.txt`, text, 'utf8')
-    return text
 }
 async function getBooks(bookShelfUrl) {
-    if(!bookShelfUrl) throw new Error('I need to know where to begin crawling')
+    if (!bookShelfUrl) throw new Error('I need to know where to begin crawling')
     const bookList = await getBookList(bookShelfUrl)
-    console.log({bookList})
+    console.log({ bookList })
     const bookTexts = await Promise.all(bookList.map(getBookText))
     console.log(bookTexts)
     // return await Promise.all(promises)
 }
 
-const bookShelfUrl =  '' //TODO: pass this in from the cli
-getBooks(bookShelfUrl || janeAusten)
+const bookShelfUrl = '' //TODO: pass this in from the cli
+getBooks(bookShelfUrl || bramStoker)

@@ -51,4 +51,8 @@ const okOptions = [
   'mareki',
   'kelrav',
   'vappog',
+  'ntuntu',
+  'bionrigge',
+  'koichy',
+  // 'jetmod', domain in use
 ]
