@@ -11,6 +11,7 @@ const phillipKDick = "https://www.gutenberg.org/ebooks/author/33399/"
 const janeAusten = "https://www.gutenberg.org/ebooks/author/1544"
 const asimov = "https://www.gutenberg.org/ebooks/author/35316"
 const bramStoker = "https://www.gutenberg.org/ebooks/author/190"
+const lovecraft = "https://www.gutenberg.org/ebooks/author/34724"
 // const
 async function getBookListHtml(bookIndexUrl) {
     if (!bookIndexUrl) throw new Error("no baseUrl")
@@ -92,4 +93,4 @@ async function getBooks(bookShelfUrl) {
 }
 
 const bookShelfUrl = '' //TODO: pass this in from the cli
-getBooks(bookShelfUrl || asimov)
+getBooks(bookShelfUrl || lovecraft)

@@ -127,8 +127,10 @@ describe('When using the test harness to run the program', () => {
           let syllables
           beforeEach(() => {
             words = difference(
-              intersect(phillipWords, asimovWords),
-              intersect(janeWords,bramWords,)
+              bramWords,
+              asimovWords,
+              phillipWords,
+              janeWords,
             ).sort()
             syllables = words.map(word => getSyllables(word)).flat()
           })
