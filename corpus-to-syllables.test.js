@@ -21,4 +21,14 @@ describe('corpusToSyllables', () => {
       })
     })
   })
+  describe('when the path is a directory', () => {
+    let syllables
+    beforeEach(async () => {
+      const path = './test_data'
+      syllables = await corpusToSyllables(path)
+    })
+    it('should return an array of syllables', () => {
+      expect(syllables.length).toBeGreaterThan(5)
+    })
+  })
 })
