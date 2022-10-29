@@ -85,6 +85,31 @@ describe('When using the test harness to run the program', () => {
             console.log({ janeWords: words })
           })
         })
+        describe('when finding words both Asimov and Dick wrote, but not Jane', () => {
+          beforeEach(() => {
+            words = difference(
+              intersect(asimovWords,dickWords),
+              janeWords,
+            ).sort()
+          })
+          it('should return an array of words', () => {
+            expect(words.length).toBeLessThan(asimovWords.length)
+            console.log({ theScarletLetterWasTerrible: words })
+          })
+        })
+        describe.only('a scratchpad for testing out these things', () => {
+          beforeEach(() => {
+            words = join(
+              dickWords,
+              janeWords,
+              asimovWords,
+            ).sort()
+          })
+          it('should return an array of words', () => {
+            expect(words.length).toBeGreaterThan(0)
+            console.log({ words })
+          })
+        })
       })
     })
   })
