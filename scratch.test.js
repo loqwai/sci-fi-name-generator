@@ -130,13 +130,13 @@ describe('When using the test harness to run the program', () => {
               intersect(phillipWords, asimovWords),
               janeWords,
               bramWords,
-            )
+            ).sort()
             syllables = words.map(word => getSyllables(word)).flat()
           })
           it('should return hopefully more interesting words', () => {
             expect(syllables.length).toBeGreaterThan(0)
-            const generatedWords = generateWords(syllables, 100)
-            console.log(JSON.stringify(generatedWords, null, 2))
+            const generatedWords = generateWords(syllables, 100).sort()
+            console.log(JSON.stringify({words,generatedWords}, null, 2))
           })
         })
       })
