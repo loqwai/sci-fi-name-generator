@@ -8,6 +8,7 @@ import filenamifyUrl from 'filenamify-url';
 
 const baseUrl = 'https://www.gutenberg.org'
 const phillipKDick = "https://www.gutenberg.org/ebooks/author/33399/"
+const janeAusten = "https://www.gutenberg.org/ebooks/author/1544"
 // const
 async function getBookListHtml(bookIndexUrl) {
     if (!bookIndexUrl) throw new Error("no baseUrl")
@@ -85,4 +86,4 @@ async function getBooks(bookShelfUrl) {
 }
 
 const bookShelfUrl =  '' //TODO: pass this in from the cli
-getBooks(bookShelfUrl || phillipKDick)
+getBooks(bookShelfUrl || janeAusten)

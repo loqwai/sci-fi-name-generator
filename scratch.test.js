@@ -18,16 +18,26 @@ const wordFromSyllables = (syllables) => {
 describe('When using the test harness to run the program', () => {
   describe('when the path is the phillipkdick folder', () => {
     let phillipSyllables
-    let uniqueSyllables
+    let janeSyllables
+    let syllablesShorterThan4
     beforeEach(async () => {
-      const path = './data/phillip_k_dick'
-      phillipSyllables = await corpusToSyllables(path)
-      uniqueSyllables = [...new Set(phillipSyllables)]
-      // writeFileSync('./data/phillip_syllables.json', JSON.stringify(uniqueSyllables, null, 2))
+      const phillipPath = './data/phillip_k_dick'
+      const janePath = './data/jane_austin'
+
+      phillipSyllables = await corpusToSyllables(phillipPath)
+      const uniquePhillipSyllables = [...new Set(phillipSyllables)]
+      janeSyllables = await corpusToSyllables(janePath)
+      const uniqueJaneSyllables = [...new Set(janeSyllables)]
+
+      const uniqueToPhillipSyllables = uniquePhillipSyllables.filter((syllable) => {
+        return !uniqueJaneSyllables.includes(syllable)
+      })
+      syllablesShorterThan4 = uniqueToPhillipSyllables.filter(s => s.length < 4)
+      // writeFileSync('./data/jane_syllables.json', JSON.stringify(phillipSyllables, null, 2))
     })
     it('should return an array of syllables', () => {
       expect(phillipSyllables.length).toBeGreaterThan(5)
-      const manyWords = new Array(10).fill(0).map(() => wordFromSyllables(uniqueSyllables))
+      const manyWords = new Array(10).fill(0).map(() => wordFromSyllables(syllablesShorterThan4))
       const wordsLongerThan5 = manyWords.filter(word => word.length > 5)
       console.log(wordsLongerThan5.join('\n'))
     })
@@ -37,4 +47,6 @@ const okOptions = [
   'tentani',
   'boungof',
   'valthec',
+  'mareki',
+  'codoclona',
 ]
