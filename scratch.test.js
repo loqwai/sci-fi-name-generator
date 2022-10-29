@@ -34,12 +34,13 @@ describe('When using the test harness to run the program', () => {
       const uniqueToPhillipSyllables = uniquePhillipSyllables.filter((syllable) => {
         return !uniqueJaneSyllables.includes(syllable)
       })
-      const phillipAndAsimovSyllables = uniquePhillipSyllables.filter((syllable) => {
+      const phillipAndAsimovSyllables = uniqueToPhillipSyllables.filter((syllable) => {
         return uniqueAsimovSyllables.includes(syllable)
       })
       console.log(phillipAndAsimovSyllables)
       syllablesShorterThan4 = phillipAndAsimovSyllables.filter(s => s.length < 4)
       // writeFileSync('./data/jane_syllables.json', JSON.stringify(phillipSyllables, null, 2))
+      console.log(syllablesShorterThan4)
     })
     it('should return an array of syllables', () => {
       expect(syllablesShorterThan4.length).toBeGreaterThan(5)
@@ -59,5 +60,6 @@ const okOptions = [
   'ntuntu',
   'bionrigge',
   'koichy',
+  'nerpab',
   // 'jetmod', domain in use
 ]
