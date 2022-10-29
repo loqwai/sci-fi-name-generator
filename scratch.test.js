@@ -1,12 +1,13 @@
 import { corpusToSyllables } from './corpus-to-syllables.js'
+import { wordsInCorpus } from './corpus-to-syllables.js'
+
 import {writeFileSync} from 'fs'
 import pronounceable from 'pronounceable'
 
 const randomInRange = (min, max) => {
-  // thanks to copilot, that cited the actual source
-  // https://stackoverflow.com/a/1527820/10840
   return Math.floor(Math.random() * (max - min + 1) + min)
 }
+
 const wordFromSyllables = (syllables) => {
   const syllableCount = syllables.length
   const wordLength = randomInRange(2, 4)
@@ -47,11 +48,11 @@ describe('When using the test harness to run the program', () => {
       const janePath = './data/jane_austin'
       const asimovPath = './data/asimov'
 
-      const philSyl = unique(await corpusToSyllables(phillipPath))
-      const asimovSyl = unique( await corpusToSyllables(asimovPath))
-      const janeSyl = unique( await corpusToSyllables(janePath))
+      const philSyl = unique(await wordsInCorpus(phillipPath))
+      const asimovSyl = unique( await wordsInCorpus(asimovPath))
+      const janeSyl = unique( await wordsInCorpus(janePath))
 
-      syllables = intersect(philSyl, difference(janeSyl, asimovSyl))
+      syllables = difference(philSyl, join(asimovSyl, janeSyl))
 
       syllables = syllables.filter(s => s.length < 4)
       // writeFileSync('./data/jane_syllables.json', JSON.stringify(phillipSyllables, null, 2))
