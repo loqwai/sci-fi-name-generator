@@ -20,19 +20,25 @@ const wordFromSyllables = (syllables) => {
 
 const intersect = (...sets) => {
   return [... sets.reduce((a, b) => {
-    return a.filter((value) => b.includes(value))
+    const uniqueA = unique(a)
+    const uniqueB = unique(b)
+    return new Set([...uniqueA].filter((x) => uniqueB.includes(x))).values()
   })]
 }
 
 const difference = (...sets) => {
   return [...sets.reduce((a, b) => {
-    return a.filter((value) => !b.includes(value))
+    const uniqueA = unique(a)
+    const uniqueB = unique(b)
+    return new Set([...uniqueA].filter((x) => !uniqueB.includes(x))).values()
   })]
 }
 
 const join = (...sets) => {
   return [...sets.reduce((a, b) => {
-    return new Set([...a, ...b]).values()
+    const uniqueA = unique(a)
+    const uniqueB = unique(b)
+    return new Set([...uniqueA, ...uniqueB]).values()
   })]
 }
 
@@ -41,16 +47,32 @@ const unique = (a) => {
 }
 
 describe('When using the test harness to run the program', () => {
-  describe('when the path is the phillipkdick folder', () => {
+  describe('when curious about word sets between authors', () => {
+    let words
+    beforeEach(async () => {
+      const phillipPath = './data/phillip_k_dick'
+      const janePath = './data/jane_austin'
+      const asimovPath = './data/asimov'
+      const dickWords = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
+      const janeWords = await wordsInCorpus(janePath)
+      const asimovWords = await wordsInCorpus(asimovPath)
+      words = intersect(dickWords, janeWords, asimovWords)
+    })
+    it('should return an array of words', () => {
+      expect(words.length).toBeGreaterThan(5)
+      console.log({words})
+    })
+  })
+  describe('when we get all the syllables in asimov, jane, and phillp', () => {
     let syllables
     beforeEach(async () => {
       const phillipPath = './data/phillip_k_dick'
       const janePath = './data/jane_austin'
       const asimovPath = './data/asimov'
 
-      const philSyl = unique(await wordsInCorpus(phillipPath))
-      const asimovSyl = unique( await wordsInCorpus(asimovPath))
-      const janeSyl = unique( await wordsInCorpus(janePath))
+      const philSyl = unique(await corpusToSyllables(phillipPath))
+      const asimovSyl = unique( await corpusToSyllables(asimovPath))
+      const janeSyl = unique( await corpusToSyllables(janePath))
 
       syllables = difference(philSyl, join(asimovSyl, janeSyl))
 
