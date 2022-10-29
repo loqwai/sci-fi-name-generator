@@ -135,6 +135,7 @@ describe('When using the test harness to run the program', () => {
           it('should return hopefully more interesting words', () => {
             const interesting = true
             expect(interesting).toBe(true)
+
             const generatedWords = generateWords(syllables, 100).sort()
             console.log(JSON.stringify({words,generatedWords}, null, 2))
             console.log(`we had ${words.length} words, and ${syllables.length} syllables to work with`)
