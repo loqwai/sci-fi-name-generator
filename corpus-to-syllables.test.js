@@ -1,4 +1,4 @@
-import { corpusToSyllables } from './corpus-to-syllables.js'
+import { corpusToSyllables } from './corpus-to-syllables'
 
 describe('corpusToSyllables', () => {
   describe('when the path is a single file', () => {
