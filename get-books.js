@@ -92,4 +92,4 @@ async function getBooks(bookShelfUrl) {
 }
 
 const bookShelfUrl = '' //TODO: pass this in from the cli
-getBooks(bookShelfUrl || bramStoker)
+getBooks(bookShelfUrl || asimov)
