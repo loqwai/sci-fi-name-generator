@@ -48,12 +48,12 @@ describe('When using the test harness to run the program', () => {
   describe('when curious about word sets between authors', () => {
     let words
     describe("when we read the words from all the authors", () => {
-      let phillip, janeWords, asimovWords
+      let phillipWords, janeWords, asimovWords
       beforeAll(async () => {
         const phillipPath = './data/phillip_k_dick'
         const janePath = './data/jane_austin'
         const asimovPath = './data/asimov'
-        phillip = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
+        phillipWords = await wordsInCorpus(phillipPath) //thanks for the variable name, copilot
         janeWords = await wordsInCorpus(janePath)
         asimovWords = await wordsInCorpus(asimovPath)
       })
@@ -63,7 +63,7 @@ describe('When using the test harness to run the program', () => {
             words = difference(
               asimovWords,
               janeWords,
-              phillip,
+              phillipWords,
             ).sort()
           })
 
@@ -77,7 +77,7 @@ describe('When using the test harness to run the program', () => {
             words = difference(
               janeWords,
               asimovWords,
-              phillip,
+              phillipWords,
             ).sort()
           })
           it('should return an array of words', () => {
@@ -88,7 +88,7 @@ describe('When using the test harness to run the program', () => {
             expect(asimovIntersection.length).toBe(0)
           })
           it('should return an array with no words in common with Phillip', () => {
-            const phillipIntersection = intersect(words, phillip)
+            const phillipIntersection = intersect(words, phillipWords)
             expect(phillipIntersection.length).toBe(0)
           })
           it('should return an array that is a subset of the words in Jane', () => {
@@ -96,29 +96,35 @@ describe('When using the test harness to run the program', () => {
             expect(janeIntersection.length).toBe(words.length)
           })
         })
-        describe('when finding words both Asimov and Phillip wrote, but not Jane', () => {
-          beforeEach(() => {
-            words = difference(
-              intersect(asimovWords,phillip),
-              janeWords,
-            ).sort()
+        describe('wait, did Phillip and Asimov both reference detroit?', () => {
+          it('should apparently be true', () => {
+            expect(phillipWords.includes('detroit')).toBe(true)
+            expect(asimovWords.includes('detroit')).toBe(true)
           })
-          it('should return an array of words', () => {
-            expect(words.length).toBeLessThan(asimovWords.length)
-            console.log({ theScarletLetterWasTerrible: words })
+          describe('when finding words both Asimov and Phillip wrote, but not Jane', () => {
+            beforeEach(() => {
+              words = difference(
+                intersect(asimovWords, phillipWords),
+                janeWords,
+              ).sort()
+            })
+            it('should return an array of words', () => {
+              expect(words.length).toBeLessThan(asimovWords.length)
+              // console.log({ theScarletLetterWasTerrible: words })
+            })
           })
         })
         describe('a scratchpad for testing out these things', () => {
           beforeEach(() => {
             words = join(
-              phillip,
+              phillipWords,
               janeWords,
               asimovWords,
             ).sort()
           })
           it('should return an array of words', () => {
             expect(words.length).toBeGreaterThan(0)
-            console.log({ words })
+            // console.log({ words })
           })
         })
       })
@@ -146,7 +152,7 @@ describe('When using the test harness to run the program', () => {
       const manyWords = new Array(100).fill(0).map(() => wordFromSyllables(syllables))
       const wordsLongerThan5 = manyWords.filter(word => word.length > 5)
       const pronounceableWords = wordsLongerThan5.filter(pronounceable.test)
-      console.log(pronounceableWords.join('\n'))
+      // console.log(pronounceableWords.join('\n'))
     })
   })
 })
