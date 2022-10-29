@@ -146,6 +146,25 @@ describe('When using the test harness to run the program', () => {
             console.log(`we had ${words.length} words, and ${syllables.length} syllables to work with`)
           })
         })
+        xdescribe("we can also diff the syllables of the words (but it's very costly)", () => {
+          let syllables
+          beforeEach(() => {
+            const phillipSyllables = phillipWords.map(word => getSyllables(word)).flat()
+            const top100Syllables = top100Words.map(word => getSyllables(word)).flat()
+            syllables = difference(
+              phillipSyllables,
+              top100Syllables,
+            )
+          })
+          it('should return hopefully more interesting words', () => {
+            const interesting = true
+            expect(interesting).toBe(true)
+
+            const generatedWords = generateWords(syllables, 1000).sort()
+            console.log(JSON.stringify({ syllables, generatedWords }, null, 2))
+            console.log(`we had ${syllables.length} syllables to work with`)
+          })
+        })
       })
     })
   })
