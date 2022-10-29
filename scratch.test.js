@@ -57,18 +57,33 @@ describe('When using the test harness to run the program', () => {
         janeWords = await wordsInCorpus(janePath)
         asimovWords = await wordsInCorpus(asimovPath)
       })
-      describe('when we compare the words', () => {
-        beforeEach(() => {
-          words = difference(
-            asimovWords,
-            janeWords,
-            dickWords,
-          ).sort()
-        })
+      describe('when you want some examples of how to use the word sets', () => {
+        describe('when finding words unique to asimov', () => {
+          beforeEach(() => {
+            words = difference(
+              asimovWords,
+              janeWords,
+              dickWords,
+            ).sort()
+          })
 
-        it('should return an array of words', () => {
-          expect(words.length).toBeGreaterThan(5)
-          console.log({ words })
+          it('should return an array of words', () => {
+            expect(words.length).toBeLessThan(asimovWords.length)
+            console.log({ asimovWords: words })
+          })
+        })
+        describe('when finding words unique to jane', () => {
+          beforeEach(() => {
+            words = difference(
+              janeWords,
+              asimovWords,
+              dickWords,
+            ).sort()
+          })
+          it('should return an array of words', () => {
+            expect(words.length).toBeLessThan(janeWords.length)
+            console.log({ janeWords: words })
+          })
         })
       })
     })
