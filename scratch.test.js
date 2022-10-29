@@ -45,8 +45,7 @@ describe('When using the test harness to run the program', () => {
 })
 const okOptions = [
   'tentani',
-  'boungof',
   'valthec',
   'mareki',
-  'codoclona',
+  'kelrav',
 ]
