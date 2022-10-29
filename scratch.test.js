@@ -49,7 +49,7 @@ describe('When using the test harness to run the program', () => {
     let words
     describe("when we read the words from all the authors", () => {
       let dickWords, janeWords, asimovWords
-      beforeEach(async () => {
+      beforeAll(async () => {
         const phillipPath = './data/phillip_k_dick'
         const janePath = './data/jane_austin'
         const asimovPath = './data/asimov'
@@ -82,7 +82,10 @@ describe('When using the test harness to run the program', () => {
           })
           it('should return an array of words', () => {
             expect(words.length).toBeLessThan(janeWords.length)
-            console.log({ janeWords: words })
+          })
+          it('should return an array with no words in common with asimov', () => {
+            const asimovIntersection = intersect(words, asimovWords)
+            expect(asimovIntersection.length).toBe(0)
           })
         })
         describe('when finding words both Asimov and Dick wrote, but not Jane', () => {
@@ -97,7 +100,7 @@ describe('When using the test harness to run the program', () => {
             console.log({ theScarletLetterWasTerrible: words })
           })
         })
-        describe.only('a scratchpad for testing out these things', () => {
+        describe('a scratchpad for testing out these things', () => {
           beforeEach(() => {
             words = join(
               dickWords,
