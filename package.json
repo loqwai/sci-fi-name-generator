@@ -19,13 +19,13 @@
   },
   "homepage": "https://github.com/redaphid/sci-fi-name-generator#readme",
   "devDependencies": {
-    "jest": "^29.2.1",
-    "jsdom": "^20.0.1",
-    "node-fetch": "^3.2.10"
+    "jest": "^29.2.1"
   },
   "dependencies": {
     "filenamify-url": "^3.0.0",
-    "pronounceable": "^1.0.1"
+    "pronounceable": "^1.0.1",
+    "jsdom": "^20.0.1",
+    "node-fetch": "^3.2.10"
   },
   "engines": {
     "node": ">=19.0.0 < 20"
