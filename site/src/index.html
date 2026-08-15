@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0a0f" />
+    <title>Nameforge — invent names from dead authors</title>
+    <meta
+      name="description"
+      content="Pick authors, get names nobody has ever used. Built from 63 classic books plus Lovecraft, Asimov and Philip K. Dick."
+    />
+    <link rel="stylesheet" href="./style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔮</text></svg>"
+    />
+  </head>
+  <body>
+    <div id="boot" class="boot">
+      <div class="boot-mark">✦</div>
+      <div class="boot-text">summoning the dead authors…</div>
+      <div class="boot-bar"><i></i></div>
+    </div>
+
+    <main id="app" hidden>
+      <header class="top">
+        <h1>NAMEFORGE</h1>
+        <button id="keptBtn" class="ghost" type="button">
+          ★ <span id="keptCount">0</span>
+        </button>
+      </header>
+
+      <section class="recipe">
+        <div class="recipe-line">
+          <span class="lead">sounds like</span>
+          <div id="incPills" class="pills"></div>
+        </div>
+        <div class="recipe-line" id="excLine" hidden>
+          <span class="lead lead-no">but not</span>
+          <div id="excPills" class="pills"></div>
+        </div>
+        <button id="pickBtn" class="pick" type="button">＋ choose authors</button>
+      </section>
+
+      <section class="dials">
+        <div class="dial" id="modeDial" hidden>
+          <div class="dial-label">two authors?</div>
+          <div class="seg" id="modeSeg">
+            <button type="button" data-mode="all" class="on">where they overlap</button>
+            <button type="button" data-mode="any">mixed together</button>
+          </div>
+        </div>
+        <div class="dial">
+          <div class="dial-label">how strange?</div>
+          <div class="seg" id="raritySeg">
+            <button type="button" data-rarity="1">unheard of</button>
+            <button type="button" data-rarity="2" class="on">strange</button>
+            <button type="button" data-rarity="6">odd</button>
+            <button type="button" data-rarity="0">anything</button>
+          </div>
+        </div>
+      </section>
+
+      <p id="status" class="status"></p>
+
+      <section id="results" class="results"></section>
+
+      <p class="foot">
+        tap a name to copy it · ★ to keep it<br />
+        <span id="footRecipe"></span>
+      </p>
+    </main>
+
+    <div id="rollBar" class="rollbar" hidden>
+      <button id="rollBtn" class="roll" type="button">ROLL AGAIN</button>
+    </div>
+
+    <!-- author picker sheet -->
+    <div id="sheet" class="sheet" hidden>
+      <div class="sheet-scrim" data-close></div>
+      <div class="sheet-body">
+        <div class="sheet-head">
+          <strong>Choose authors</strong>
+          <button class="ghost" type="button" data-close>done</button>
+        </div>
+        <p class="sheet-hint">
+          tap once = <b class="yes">sounds like</b> · twice = <b class="no">but not</b> · again to clear
+        </p>
+        <div id="chipGroups" class="chip-groups"></div>
+      </div>
+    </div>
+
+    <!-- kept names sheet -->
+    <div id="keptSheet" class="sheet" hidden>
+      <div class="sheet-scrim" data-close-kept></div>
+      <div class="sheet-body">
+        <div class="sheet-head">
+          <strong>Kept names</strong>
+          <button class="ghost" type="button" data-close-kept>done</button>
+        </div>
+        <div id="keptList" class="kept-list"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
