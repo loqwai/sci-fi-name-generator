@@ -109,110 +109,208 @@ await step('rarity dial changes the pool', async () => {
   await page.waitForTimeout(500)
 })
 
-await step('set operations are named on the first screen', async () => {
-  const txt = await page.textContent('.recipe')
-  for (const term of ['INCLUDE', 'INTERSECTION', 'UNION', 'DIFFERENCE']) {
+await step('set operations are still named on the first screen', async () => {
+  const txt = await page.textContent('main')
+  for (const term of ['INCLUDE', 'INTERSECTION', 'UNION', 'DIFFERENCE', 'AUTHORS']) {
     if (!txt.includes(term)) throw new Error(`"${term}" not on the first screen`)
   }
-  // and the live expression, in his own notation
   const expr = await page.textContent('#expr')
   if (!/∩|∪/.test(expr)) throw new Error(`expression was "${expr}"`)
-  if (!/∖ common/.test(expr)) throw new Error(`no difference term in "${expr}"`)
 })
 
-await step('an exclude entry point is visible without opening anything', async () => {
-  const btns = await page.$$eval('.addbtn', (e) => e.map((x) => x.textContent.trim()))
-  if (!btns.some((b) => /exclude/i.test(b))) throw new Error(`add buttons were ${btns.join(' | ')}`)
+await step('every author exposes its own + and - with nothing opened', async () => {
+  const rows = await page.$$eval('.author-row', (e) => e.length)
+  if (rows < 30) throw new Error(`only ${rows} author rows`)
+  const plus = await page.$$eval('.author-row .plus', (e) => e.length)
+  const minus = await page.$$eval('.author-row .minus', (e) => e.length)
+  if (plus !== rows || minus !== rows) throw new Error(`${plus} plus / ${minus} minus for ${rows} rows`)
+  // and no sheet/modal exists at all any more
+  if (await page.$('#sheet')) throw new Error('the author picker sheet still exists')
 })
 
-await step('author sheet opens straight into the exclude set', async () => {
-  await page.click('.setgroup.no .addbtn')
-  await page.waitForSelector('.chip', { timeout: 3000 })
-  const c = await page.$$eval('.chip', (e) => e.length)
-  if (c < 30) throw new Error(`only ${c} chips`)
-  const title = await page.textContent('#sheetTitle')
-  if (!/exclude/i.test(title)) throw new Error(`sheet said "${title}"`)
-  const tab = await page.getAttribute('#pickTabs button[data-mode="exc"]', 'class')
-  if (!/on/.test(tab)) throw new Error('exclude tab not active')
-  await page.screenshot({ path: join(SHOTS, `${TAG}-2-authors.png`) })
+// The bar the coordinator set: one tap, no panel, no mode.
+await step('ONE TAP excludes an author from the default screen', async () => {
+  const row = page.locator('.author-row[data-id="shakespeare"]')
+  await row.scrollIntoViewIfNeeded()
+  const before = await page.textContent('#expr')
+  if (/Shakespeare/.test(before)) throw new Error('Shakespeare already in the recipe')
+  await row.locator('.minus').click() // <-- the single tap
+  await page.waitForTimeout(500)
+  if ((await row.getAttribute('data-state')) !== 'exc') throw new Error('row not excluded')
+  const after = await page.textContent('#expr')
+  if (!/∖ Shakespeare/.test(after)) throw new Error(`expression was "${after}"`)
 })
 
-await step('tapping under the EXCLUDE tab excludes (no hidden cycle)', async () => {
-  const chip = page.locator('.chip[data-id="dickens"]')
-  await chip.click()
-  await page.waitForTimeout(350)
-  if ((await chip.getAttribute('data-state')) !== 'exc') throw new Error('did not exclude in one tap')
-  if (!/∖ Dickens/.test(await page.textContent('#expr'))) throw new Error('expression missing the difference')
-  await chip.click()
+await step('ONE TAP moves the same author from exclude to include', async () => {
+  const row = page.locator('.author-row[data-id="shakespeare"]')
+  await row.locator('.plus').click() // <-- single tap, no need to clear first
+  await page.waitForTimeout(500)
+  if ((await row.getAttribute('data-state')) !== 'inc') throw new Error('row not included')
+  if (/∖ Shakespeare/.test(await page.textContent('#expr'))) throw new Error('still excluded')
+})
+
+await step('ONE TAP on the visible ✕ clears an author', async () => {
+  const row = page.locator('.author-row[data-id="shakespeare"]')
+  const clr = row.locator('.clr')
+  if (!(await clr.isVisible())) throw new Error('clear button not visible on a set author')
+  await clr.click() // <-- the single tap
+  await page.waitForTimeout(500)
+  if (await row.getAttribute('data-state')) throw new Error('not cleared')
+  if (/Shakespeare/.test(await page.textContent('#expr'))) throw new Error('still in the recipe')
+})
+
+await step('the ✕ only appears on authors that have a state', async () => {
+  const neutral = page.locator('.author-row[data-id="wilde"] .clr')
+  if (await neutral.isVisible()) throw new Error('clear shown on an untouched author')
+  const set = page.locator('.author-row[data-id="lovecraft"] .clr')
+  if (!(await set.isVisible())) throw new Error('clear missing on an included author')
+})
+
+await step('start over resets everything in one tap', async () => {
+  await page.locator('.author-row[data-id="dickens"] .minus').click()
   await page.waitForTimeout(300)
-  if (await chip.getAttribute('data-state')) throw new Error('second tap did not undo')
+  await page.locator('.author-row[data-id="wilde"] .plus').click()
+  await page.waitForTimeout(300)
+  await page.click('#resetBtn') // <-- the single tap
+  await page.waitForTimeout(600)
+  const expr = await page.textContent('#expr')
+  if (/Dickens|Wilde/.test(expr)) throw new Error(`reset left "${expr}"`)
+  if (!/Lovecraft/.test(expr)) throw new Error(`reset lost the default: "${expr}"`)
 })
 
-await step('state is legible without colour (sign glyph + line-through)', async () => {
-  await page.click('#pickTabs button[data-mode="inc"]')
-  await page.waitForTimeout(200)
-  await page.click('.chip[data-id="shakespeare"]')
-  await page.waitForTimeout(300)
-  const sign = await page.textContent('.chip[data-id="shakespeare"] .sign')
-  if (sign.trim() !== '＋') throw new Error(`include sign was "${sign}"`)
-  await page.click('#pickTabs button[data-mode="exc"]')
-  await page.waitForTimeout(200)
-  await page.click('.chip[data-id="dickens"]')
-  await page.waitForTimeout(300)
-  const deco = await page.$eval('.chip[data-id="dickens"]', (e) => getComputedStyle(e).textDecorationLine)
-  if (!/line-through/.test(deco)) throw new Error(`excluded chip decoration was "${deco}"`)
-  const s2 = await page.textContent('.chip[data-id="dickens"] .sign')
-  if (s2.trim() !== '−') throw new Error(`exclude sign was "${s2}"`)
-  // put Dickens back
-  await page.click('.chip[data-id="dickens"]')
-  await page.waitForTimeout(250)
+await step('excluded rows read without colour (line-through)', async () => {
+  const row = page.locator('.author-row[data-id="dickens"]')
+  await row.scrollIntoViewIfNeeded()
+  await row.locator('.minus').click()
+  await page.waitForTimeout(400)
+  const deco = await page.$eval('.author-row[data-id="dickens"] .nm', (e) => getComputedStyle(e).textDecorationLine)
+  if (!/line-through/.test(deco)) throw new Error(`decoration was "${deco}"`)
+  await row.locator('.minus').click()
+  await page.waitForTimeout(400)
 })
 
-await step('picking a fresh recipe regenerates', async () => {
-  await page.click('#pickTabs button[data-mode="inc"]')
-  await page.waitForTimeout(200)
-  for (const id of ['lovecraft', 'stoker']) {
-    await page.click(`.chip[data-id="${id}"]`) // already included -> one tap clears
-    await page.waitForTimeout(160)
+await step('PROOF panel shows real source words', async () => {
+  const txt = await page.textContent('#proofBox')
+  if (!/words survived/.test(txt)) throw new Error('no survived stage')
+  const box = await page.textContent('.wordbox')
+  const sample = box.split(', ').filter(Boolean)
+  if (sample.length < 20) throw new Error(`only ${sample.length} words shown`)
+  // they must be REAL words from the corpus, not generated ones
+  for (const w of sample.slice(0, 5)) {
+    if (!/^[a-z]+$/.test(w.trim())) throw new Error(`odd word "${w}"`)
   }
-  await page.click('.chip[data-id="bible"]')
+  console.log(`       set sample: ${sample.slice(0, 12).join(', ')}`)
+})
+
+await step('PROOF panel shows what common English removed', async () => {
+  const txt = await page.textContent('#proofBox')
+  if (!/dropped as common English/.test(txt)) throw new Error('no dropped stage')
+  const boxes = await page.$$eval('.wordbox', (e) => e.map((x) => x.textContent))
+  if (boxes.length < 2) throw new Error('no second word list')
+  console.log(`       dropped sample: ${boxes[boxes.length - 1].split(', ').slice(0, 10).join(', ')}`)
+})
+
+await step('every name card shows how it was assembled', async () => {
+  const parts = await page.$$eval('.name .parts', (e) => e.map((x) => x.textContent))
+  if (parts.length < 20) throw new Error(`only ${parts.length} cards show parts`)
+  if (!parts.every((p) => p.includes('+'))) throw new Error('a card had no syllable breakdown')
+  console.log(`       first card assembled from: ${parts[0]}`)
+})
+
+await step('tapping a name traces it back to real source words', async () => {
+  await page.click('.name')
   await page.waitForTimeout(400)
-  await page.click('#sheet .sheet-head [data-close]')
+  const t = await page.textContent('#traceBox')
+  if (!/came from/.test(t)) throw new Error('no trace shown')
+  if (!/←/.test(t)) throw new Error('no source words in trace')
+  console.log(`       trace: ${t.replace(/\s+/g, ' ').slice(0, 110)}`)
+})
+
+await step('status shows the set size after every stage', async () => {
+  const stages = await page.$$eval('.status .stage', (e) => e.map((x) => x.textContent.trim()))
+  if (stages.length < 2) throw new Error(`only ${stages.length} stages shown: ${stages.join(' | ')}`)
+  if (!stages.some((t) => /common/.test(t))) throw new Error(`no common stage: ${stages.join(' | ')}`)
+  const txt = await page.textContent('#status')
+  if (!/syllables/.test(txt)) throw new Error('no syllable count')
+  console.log(`       stages: ${stages.join(' -> ')}`)
+})
+
+// Exactly what he hit: + on PKD and Asimov while the two defaults were still
+// included, giving a four-way intersection at the strictest setting.
+await step('HIS BUG: a run-dry result names the stage that emptied it', async () => {
+  await page.click('#resetBtn')
   await page.waitForTimeout(400)
+  for (const id of ['pkd', 'asimov']) {
+    const row = page.locator(`.author-row[data-id="${id}"]`)
+    await row.scrollIntoViewIfNeeded()
+    await row.locator('.plus').click()
+    await page.waitForTimeout(250)
+  }
+  await page.click('#raritySeg button[data-rarity="1"]')
+  await page.waitForTimeout(700)
+
+  const stages = await page.$$eval('.status .stage', (e) => e.map((x) => x.textContent.trim()))
+  console.log(`       4-way stages: ${stages.join(' -> ')}`)
   const n = await names()
-  if (!n.length) throw new Error('no names for Shakespeare + Bible')
-  console.log(`       Shakespeare n Bible: ${n.slice(0, 8).join(', ')}`)
-  await page.screenshot({ path: join(SHOTS, `${TAG}-3-shakespeare-bible.png`) })
+  if (n.length === 0) {
+    const why = await page.textContent('.status .why')
+    if (!why || !/cut it to|share only|too few/.test(why))
+      throw new Error(`empty result was not explained: "${why}"`)
+    if (!(await page.$('.fix'))) throw new Error('no recovery button offered')
+    console.log(`       explained: ${why.replace(/\s+/g, ' ').slice(0, 100)}`)
+    await page.screenshot({ path: join(SHOTS, `${TAG}-6-explained.png`) })
+    await page.click('.fix')
+    await page.waitForTimeout(700)
+    if (!(await names()).length) throw new Error('the offered fix did not produce names')
+  } else {
+    // still must show a truthful chain
+    if (stages.length < 2) throw new Error('no stage chain')
+  }
+  await page.click('#resetBtn')
+  await page.waitForTimeout(500)
+})
+
+await step('UNION of PKD and Asimov is never empty in the UI', async () => {
+  await page.click('#resetBtn')
+  await page.waitForTimeout(300)
+  for (const id of ['lovecraft', 'stoker']) {
+    const row = page.locator(`.author-row[data-id="${id}"]`)
+    await row.scrollIntoViewIfNeeded()
+    await row.locator('.clr').click()
+    await page.waitForTimeout(200)
+  }
+  for (const id of ['pkd', 'asimov']) {
+    const row = page.locator(`.author-row[data-id="${id}"]`)
+    await row.scrollIntoViewIfNeeded()
+    await row.locator('.plus').click()
+    await page.waitForTimeout(200)
+  }
+  await page.click('#modeSeg button[data-mode="any"]')
+  await page.waitForTimeout(700)
+  const n = await names()
+  if (!n.length) throw new Error('PKD ∪ Asimov produced no names in the UI')
+  const txt = await page.textContent('#status')
+  console.log(`       PKD ∪ Asimov: ${txt.replace(/\s+/g, ' ').slice(0, 90)}`)
+  console.log(`       names: ${n.slice(0, 8).join(', ')}`)
+  await page.click('#resetBtn')
+  await page.waitForTimeout(500)
 })
 
 await step('operator switches between ∩ and ∪', async () => {
   await page.click('#modeSeg button[data-mode="any"]')
   await page.waitForTimeout(600)
-  if (!/∪/.test(await page.textContent('#expr'))) throw new Error('expression did not switch to union')
-  const n = await names()
-  if (!n.length) throw new Error('no names in union mode')
+  if (!/∪/.test(await page.textContent('#expr'))) throw new Error('did not switch to union')
+  if (!(await names()).length) throw new Error('no names in union mode')
   await page.click('#modeSeg button[data-mode="all"]')
   await page.waitForTimeout(600)
-})
-
-await step('removing an author from the first screen works', async () => {
-  const before = await page.$$eval('#incPills .pill', (e) => e.length)
-  await page.click('#incPills .pill .x')
-  await page.waitForTimeout(500)
-  const after = await page.$$eval('#incPills .pill', (e) => e.length)
-  if (after !== before - 1) throw new Error(`pills went ${before} -> ${after}`)
 })
 
 await step('recipe survives a reload via the url', async () => {
   const url = page.url()
   if (!/#/.test(url)) throw new Error('no recipe in url')
-  const before = await page.$$eval('#incPills .pill', (e) => e.map((x) => x.textContent))
   const exprBefore = await page.textContent('#expr')
-  if (!before.length) throw new Error('nothing included before reload')
   await page.goto(url, { waitUntil: 'networkidle' })
   await page.waitForSelector('.name', { timeout: 20000 })
-  const after = await page.$$eval('#incPills .pill', (e) => e.map((x) => x.textContent))
-  if (after.join() !== before.join()) throw new Error(`pills ${before.join('|')} -> ${after.join('|')}`)
   const exprAfter = await page.textContent('#expr')
   if (exprAfter !== exprBefore) throw new Error(`expr "${exprBefore}" -> "${exprAfter}"`)
 })

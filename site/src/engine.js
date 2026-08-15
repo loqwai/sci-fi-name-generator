@@ -83,6 +83,58 @@ export const getSyllables = (word) => word.match(syllableRegex)
 //   exclude: [sourceId]
 //   rarity:  N   -- drop words appearing in >= N of the 63 classics.
 //                   1 = his original "not in top100 at all". 0 = off.
+// Returns every intermediate stage, so the UI can show what each operation
+// removed -- not just what survived. "These 1,204 words were dropped as common
+// English" is the step you otherwise have to take on faith.
+export const selectStages = (corpus, recipe) => {
+  const { bitsets, wordsPerSet } = corpus
+  const base = selectWords(corpus, { ...recipe, exclude: [], rarity: 0 })
+  const afterExclude = base.slice()
+  for (const id of recipe.exclude) {
+    const b = bitsets[id]
+    if (!b) continue
+    for (let i = 0; i < wordsPerSet; i++) afterExclude[i] &= ~b[i]
+  }
+  const final = selectWords(corpus, recipe)
+
+  const droppedByExclude = new Uint32Array(wordsPerSet)
+  const droppedByCommon = new Uint32Array(wordsPerSet)
+  for (let i = 0; i < wordsPerSet; i++) {
+    droppedByExclude[i] = base[i] & ~afterExclude[i]
+    droppedByCommon[i] = afterExclude[i] & ~final[i]
+  }
+  return { base, afterExclude, final, droppedByExclude, droppedByCommon }
+}
+
+// Walk a bitset back to the words themselves. `limit` takes an even spread
+// rather than the first N -- the vocabulary is ordered by membership pattern,
+// so the first N would all come from one cluster and look unrepresentative.
+export const wordsIn = (corpus, bitset, limit = 0) => {
+  const out = []
+  const { words } = corpus
+  for (let i = 0; i < words.length; i++) {
+    if (bitset[i >>> 5] & (1 << (i & 31))) out.push(words[i])
+  }
+  if (!limit || out.length <= limit) return out
+  const step = out.length / limit
+  const sample = []
+  for (let i = 0; i < limit; i++) sample.push(out[Math.floor(i * step)])
+  return sample
+}
+
+// Which source words in the current set actually contain this syllable? This is
+// what makes a generated name checkable: you can see the real words it came from.
+export const wordsWithSyllable = (corpus, bitset, syllable, limit = 6) => {
+  const out = []
+  const { words } = corpus
+  for (let i = 0; i < words.length && out.length < limit; i++) {
+    if ((bitset[i >>> 5] & (1 << (i & 31))) === 0) continue
+    const syls = getSyllables(words[i])
+    if (syls && syls.some((s) => s.toLowerCase() === syllable)) out.push(words[i])
+  }
+  return out
+}
+
 export const selectWords = (corpus, recipe) => {
   const { bitsets, df, wordsPerSet } = corpus
   const inc = recipe.include.filter((id) => bitsets[id])

@@ -30,40 +30,51 @@
         </button>
       </header>
 
-      <section class="recipe">
-        <div class="setgroup yes">
-          <div class="setname"><span class="num">1</span> INCLUDE</div>
+      <p id="expr" class="expr"></p>
+
+      <section class="controls">
+        <div class="ctl">
+          <div class="ctl-label">INCLUDE <span class="muted" id="incGloss"></span></div>
           <div class="seg" id="modeSeg">
             <button type="button" data-mode="all" class="on">∩ INTERSECTION</button>
             <button type="button" data-mode="any">∪ UNION</button>
           </div>
-          <p class="gloss" id="incGloss">only words <b>every</b> one of these authors used</p>
-
-          <div id="incPills" class="pills"></div>
         </div>
-
-        <div class="setgroup no">
-          <div class="setname"><span class="num">2</span> DIFFERENCE ∖ <span class="muted">exclude authors</span></div>
-          <p class="gloss">their words are <b>subtracted</b> from the set above</p>
-          <div id="excPills" class="pills"></div>
-        </div>
-
-        <div class="setgroup no">
-          <div class="setname"><span class="num">3</span> DIFFERENCE ∖ <span class="muted">common English</span></div>
-          <p class="gloss" id="rarityGloss"></p>
+        <div class="ctl">
+          <div class="ctl-label">
+            DIFFERENCE ∖ <span class="muted">common English</span>
+          </div>
           <div class="seg" id="raritySeg">
             <button type="button" data-rarity="1">≥ 1</button>
             <button type="button" data-rarity="2" class="on">≥ 2</button>
             <button type="button" data-rarity="6">≥ 6</button>
             <button type="button" data-rarity="0">off</button>
           </div>
+          <p class="gloss" id="rarityGloss"></p>
         </div>
       </section>
 
-      <p id="expr" class="expr"></p>
+      <section class="authors">
+        <div class="authors-head">
+          <span class="ctl-label">AUTHORS</span>
+          <span class="key">
+            <b class="k-inc">＋</b> include · <b class="k-exc">−</b> exclude ·
+            <b class="k-clr">✕</b> clear
+          </span>
+          <button id="resetBtn" class="reset" type="button">↺ start over</button>
+        </div>
+        <div id="authorList" class="author-list"></div>
+      </section>
+
       <p id="status" class="status"></p>
 
       <section id="results" class="results"></section>
+
+      <section class="proof" id="proof">
+        <div class="ctl-label">PROOF — the real words behind the names</div>
+        <div id="traceBox" class="trace" hidden></div>
+        <div id="proofBox"></div>
+      </section>
 
       <p class="foot">
         tap a name to copy it · ★ to keep it<br />
@@ -73,36 +84,6 @@
 
     <div id="rollBar" class="rollbar" hidden>
       <button id="rollBtn" class="roll" type="button">ROLL AGAIN</button>
-    </div>
-
-    <!-- author picker sheet -->
-    <div id="sheet" class="sheet" hidden>
-      <div class="sheet-scrim" data-close></div>
-      <div class="sheet-body">
-        <div class="sheet-head">
-          <strong id="sheetTitle">Authors</strong>
-          <button class="ghost" type="button" data-close>done</button>
-        </div>
-
-        <div class="tabs" id="pickTabs">
-          <button type="button" data-mode="inc" class="on">＋ INCLUDE</button>
-          <button type="button" data-mode="exc">− EXCLUDE</button>
-        </div>
-        <p class="sheet-hint" id="pickHint"></p>
-
-        <div class="summary">
-          <div class="summary-row yes">
-            <span class="summary-label">＋ INCLUDE</span>
-            <div id="sumInc" class="pills"></div>
-          </div>
-          <div class="summary-row no">
-            <span class="summary-label">− EXCLUDE</span>
-            <div id="sumExc" class="pills"></div>
-          </div>
-        </div>
-
-        <div id="chipGroups" class="chip-groups"></div>
-      </div>
     </div>
 
     <!-- kept names sheet -->

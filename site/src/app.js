@@ -1,6 +1,9 @@
 import {
   parseCorpus,
   selectWords,
+  selectStages,
+  wordsIn,
+  wordsWithSyllable,
   syllablePool,
   generateNames,
   countBits,
@@ -17,13 +20,21 @@ const DEFAULT_RECIPE = {
   rarity: 2,
 }
 
+// Deep copy, always. A shallow spread shares the include/exclude arrays with
+// DEFAULT_RECIPE, so every tap quietly rewrote the default and "start over"
+// could never get back to it.
+const freshRecipe = () => ({
+  ...DEFAULT_RECIPE,
+  include: [...DEFAULT_RECIPE.include],
+  exclude: [...DEFAULT_RECIPE.exclude],
+})
+
 const state = {
   corpus: null,
-  recipe: { ...DEFAULT_RECIPE },
+  recipe: freshRecipe(),
   seed: (Math.random() * 1e9) | 0,
   kept: [],
   poolCache: new Map(),
-  pickMode: 'inc', // which set the picker is currently editing
 }
 
 // ---------------------------------------------------------------- loading
@@ -146,142 +157,325 @@ const renderExpr = () => {
 
 // ---------------------------------------------------------------- rendering
 
-// Build one pill: sign glyph + name + a remove button. The glyph means the
-// state survives a bad screen, bad light and colourblindness.
-const pillFor = (id, kind, onRemove) => {
-  const p = document.createElement('span')
-  p.className = 'pill' + (kind === 'exc' ? ' no' : '')
-  const sign = document.createElement('span')
-  sign.className = 'sign'
-  sign.textContent = kind === 'exc' ? '−' : '＋'
-  const name = document.createElement('span')
-  name.textContent = labelOf(id)
-  const x = document.createElement('button')
-  x.type = 'button'
-  x.className = 'x'
-  x.textContent = '✕'
-  x.setAttribute('aria-label', `remove ${labelOf(id)}`)
-  x.onclick = onRemove
-  p.append(sign, name, x)
-  return p
+// One flat list. Every author owns a + and a -, both always visible, both one
+// tap. No mode to be in, no panel to open, nothing to discover. The two
+// previous designs each put a mode or a sheet in the way and he reported the
+// same confusion both times.
+const renderAuthors = () => {
+  const wrap = $('authorList')
+  wrap.innerHTML = ''
+  const { sources, groups } = state.corpus.meta
+  for (const g of groups) {
+    const inGroup = sources.filter((s) => s.group === g.id)
+    if (!inGroup.length) continue
+    const h = document.createElement('div')
+    h.className = 'author-group'
+    h.textContent = g.label
+    wrap.append(h)
+    for (const s of inGroup) {
+      const row = document.createElement('div')
+      row.className = 'author-row'
+      row.dataset.id = s.id
+
+      const plus = document.createElement('button')
+      plus.type = 'button'
+      plus.className = 'plus'
+      plus.textContent = '＋'
+      plus.setAttribute('aria-label', `include ${s.label}`)
+      plus.onclick = () => setAuthor(s.id, 'inc')
+
+      const minus = document.createElement('button')
+      minus.type = 'button'
+      minus.className = 'minus'
+      minus.textContent = '−'
+      minus.setAttribute('aria-label', `exclude ${s.label}`)
+      minus.onclick = () => setAuthor(s.id, 'exc')
+
+      const nm = document.createElement('span')
+      nm.className = 'nm'
+      nm.textContent = s.label
+
+      // Clearing is its own visible control, present only when there is
+      // something to clear. Making + or - toggle back off would just be the
+      // hidden cycle again, one level down.
+      const clr = document.createElement('button')
+      clr.type = 'button'
+      clr.className = 'clr'
+      clr.textContent = '✕'
+      clr.setAttribute('aria-label', `clear ${s.label}`)
+      clr.onclick = () => setAuthor(s.id, '')
+
+      row.append(plus, minus, nm, clr)
+      wrap.append(row)
+    }
+  }
+  syncAuthors()
 }
 
-const fillPills = (el, ids, kind, addLabel) => {
-  el.innerHTML = ''
-  for (const id of ids) {
-    el.append(
-      pillFor(id, kind, () => {
-        const arr = kind === 'exc' ? state.recipe.exclude : state.recipe.include
-        arr.splice(arr.indexOf(id), 1)
-        renderPills()
-        syncChips()
-        renderSummary()
-        roll()
-      }),
-    )
-  }
-  if (addLabel !== null) {
-    const b = document.createElement('button')
-    b.type = 'button'
-    b.className = 'addbtn'
-    b.textContent = addLabel
-    b.onclick = () => openSheet(kind)
-    el.append(b)
+// `want` is 'inc', 'exc' or '' (clear). Each button states an outcome rather
+// than toggling, so no tap depends on remembering the current state.
+const setAuthor = (id, want) => {
+  const { include, exclude } = state.recipe
+  const inInc = include.indexOf(id)
+  const inExc = exclude.indexOf(id)
+  if (inInc >= 0) include.splice(inInc, 1)
+  if (inExc >= 0) exclude.splice(inExc, 1)
+  if (want === 'inc') include.push(id)
+  else if (want === 'exc') exclude.push(id)
+
+  syncAuthors()
+  renderControls()
+  roll()
+}
+
+const resetAll = () => {
+  state.recipe = freshRecipe()
+  state.seed = (Math.random() * 1e9) | 0
+  syncAuthors()
+  renderControls()
+  roll()
+  $('authorList').scrollTop = 0
+  toast('back to the default')
+}
+
+const syncAuthors = () => {
+  for (const row of document.querySelectorAll('.author-row')) {
+    const id = row.dataset.id
+    const st = state.recipe.include.includes(id)
+      ? 'inc'
+      : state.recipe.exclude.includes(id)
+        ? 'exc'
+        : ''
+    if (st) row.dataset.state = st
+    else delete row.dataset.state
+    row.querySelector('.plus').classList.toggle('on', st === 'inc')
+    row.querySelector('.minus').classList.toggle('on', st === 'exc')
+    row.querySelector('.clr').hidden = !st
   }
 }
 
-const renderPills = () => {
-  const { include, exclude, mode, rarity } = state.recipe
-  fillPills($('incPills'), include, 'inc', include.length ? '＋ add' : '＋ add an author')
-  fillPills($('excPills'), exclude, 'exc', exclude.length ? '＋ add' : '＋ add an author to exclude')
-
-  $('incGloss').innerHTML =
-    mode === 'all'
-      ? 'only words <b>every</b> one of these authors used'
-      : 'every word used by <b>any</b> of these authors'
-
+const renderControls = () => {
+  const { mode, rarity } = state.recipe
+  $('incGloss').textContent =
+    mode === 'all' ? '— words every one of them used' : '— words any of them used'
   $('rarityGloss').innerHTML =
     rarity === 0
       ? 'nothing dropped — common words stay in'
       : `drop words used in <b>${rarity} or more</b> of the 63 classics`
-
   for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.mode === mode)
   for (const b of $('raritySeg').children)
     b.classList.toggle('on', Number(b.dataset.rarity) === rarity)
   renderExpr()
 }
 
-// The two membership zones inside the picker: you can always see which set each
-// author currently sits in, without tapping anything.
-const renderSummary = () => {
-  const { include, exclude } = state.recipe
-  const none = (el, text) => {
-    const d = document.createElement('span')
-    d.className = 'pill empty'
-    d.textContent = text
-    el.append(d)
+// ---------------------------------------------------------------- proof
+//
+// He wrote this algorithm and wants to see it working, which is fair: a count
+// and some invented words prove nothing on their own. So show the real
+// vocabulary each stage kept AND what it threw away, and let any generated name
+// be traced back to the source words its syllables came from.
+
+const WORD_SAMPLE = 400
+
+const stageBlock = (title, cls, count, words, note) => {
+  const wrap = document.createElement('div')
+  wrap.className = 'proof-stage'
+  const h = document.createElement('div')
+  h.className = `stage-head ${cls}`
+  const n = document.createElement('span')
+  n.className = 'n'
+  n.textContent = count.toLocaleString()
+  h.append(n, document.createTextNode(' ' + title))
+  wrap.append(h)
+  if (note) {
+    const p = document.createElement('p')
+    p.className = 'gloss'
+    p.textContent = note
+    wrap.append(p)
   }
-  fillPills($('sumInc'), include, 'inc', null)
-  fillPills($('sumExc'), exclude, 'exc', null)
-  if (!include.length) none($('sumInc'), 'nobody yet')
-  if (!exclude.length) none($('sumExc'), 'nobody yet')
+  const box = document.createElement('div')
+  box.className = 'wordbox' + (cls === 'cut' ? ' cut' : '')
+  box.textContent = words.length ? words.join(', ') : '(none)'
+  wrap.append(box)
+  return wrap
 }
 
-const renderChips = () => {
-  const wrap = $('chipGroups')
-  wrap.innerHTML = ''
-  const { sources, groups } = state.corpus.meta
-  for (const g of groups) {
-    const inGroup = sources.filter((s) => s.group === g.id)
-    if (!inGroup.length) continue
-    const sec = document.createElement('div')
-    sec.className = 'chip-group'
-    const h = document.createElement('h3')
-    h.textContent = g.label
+const renderProof = (stages) => {
+  const box = $('proofBox')
+  box.innerHTML = ''
+  if (!stages) {
+    const p = document.createElement('p')
+    p.className = 'gloss'
+    p.textContent = 'Pick an author to see the words.'
+    box.append(p)
+    return
+  }
+
+  const keptN = countBits(stages.final)
+  const kept = wordsIn(state.corpus, stages.final, WORD_SAMPLE)
+  box.append(
+    stageBlock(
+      'words survived — these are what the names are built from',
+      'kept',
+      keptN,
+      kept,
+      keptN > WORD_SAMPLE ? `showing an even spread of ${WORD_SAMPLE}` : '',
+    ),
+  )
+
+  const exN = countBits(stages.droppedByExclude)
+  if (exN) {
+    box.append(
+      stageBlock(
+        `removed by ∖ ${state.recipe.exclude.map(labelOf).join(', ')}`,
+        'cut',
+        exN,
+        wordsIn(state.corpus, stages.droppedByExclude, 120),
+      ),
+    )
+  }
+
+  const cmN = countBits(stages.droppedByCommon)
+  if (cmN) {
+    box.append(
+      stageBlock(
+        `dropped as common English (≥${state.recipe.rarity} classics)`,
+        'cut',
+        cmN,
+        wordsIn(state.corpus, stages.droppedByCommon, 120),
+      ),
+    )
+  }
+}
+
+// Tapping a name shows the source words each of its syllables came from.
+const renderTrace = (n) => {
+  const el = $('traceBox')
+  el.innerHTML = ''
+  el.hidden = false
+  const stages = state.stages
+  if (!stages) return
+
+  const h = document.createElement('h4')
+  h.append(document.createTextNode('where '))
+  const nm = document.createElement('span')
+  nm.textContent = n.name
+  h.append(nm, document.createTextNode(' came from'))
+  el.append(h)
+
+  for (const syl of n.parts) {
     const row = document.createElement('div')
-    row.className = 'chips'
-    for (const s of inGroup) {
-      const b = document.createElement('button')
-      b.type = 'button'
-      b.className = 'chip'
-      b.dataset.id = s.id
-      const sign = document.createElement('span')
-      sign.className = 'sign'
-      b.append(sign, document.createTextNode(s.label))
-      row.append(b)
+    row.className = 'trace-syl'
+    const b = document.createElement('b')
+    b.textContent = syl
+    const i = document.createElement('i')
+    const src = wordsWithSyllable(state.corpus, stages.final, syl, 6)
+    i.textContent = src.length ? '← ' + src.join(', ') : '← (in the set)'
+    row.append(b, i)
+    el.append(row)
+  }
+}
+
+// The set size after every stage, always on screen.
+//
+// He reported "PKD ∪ Asimov was empty". The union was 7,550 words and fine; he
+// had the two defaults still included, so it was a FOUR-way intersection, and
+// then common(≥1) took 1,665 words down to 2. The maths was right and the UI
+// said nothing -- which is indistinguishable from broken. So: show the count
+// after each operation, and if one of them empties the set, name it.
+const stageChain = () => {
+  const { include, exclude, mode, rarity } = state.recipe
+  const s = state.stages
+  const out = []
+  const op = mode === 'all' ? '∩' : '∪'
+  out.push({
+    label: include.length > 1 ? `${op} ${include.length} authors` : labelOf(include[0]),
+    n: countBits(s.base),
+  })
+  if (exclude.length) out.push({ label: `∖ ${exclude.map(labelOf).join(', ')}`, n: countBits(s.afterExclude) })
+  if (rarity > 0) out.push({ label: `∖ common(≥${rarity})`, n: countBits(s.final) })
+  return out
+}
+
+const renderStatus = (pool, nameCount) => {
+  const status = $('status')
+  status.innerHTML = ''
+  status.classList.remove('warn')
+  const chain = stageChain()
+
+  for (const [i, st] of chain.entries()) {
+    if (i) {
+      const arrow = document.createElement('span')
+      arrow.className = 'arrow'
+      arrow.textContent = ' → '
+      status.append(arrow)
     }
-    sec.append(h, row)
-    wrap.append(sec)
+    const span = document.createElement('span')
+    span.className = 'stage' + (st.n === 0 ? ' zero' : '')
+    const n = document.createElement('b')
+    n.textContent = st.n.toLocaleString()
+    span.append(n, document.createTextNode(' ' + st.label))
+    status.append(span)
   }
-  syncChips()
+  const tail = document.createElement('span')
+  tail.className = 'arrow'
+  tail.textContent = ` → ${pool.length.toLocaleString()} syllables`
+  status.append(tail)
+
+  const jump = document.createElement('a')
+  jump.className = 'jump'
+  jump.href = '#proof'
+  jump.textContent = 'see the words ▸'
+  status.append(jump)
+
+  if (nameCount === 0) explainEmpty(chain, pool)
 }
 
-const syncChips = () => {
-  for (const b of document.querySelectorAll('.chip')) {
-    const id = b.dataset.id
-    const st = state.recipe.include.includes(id)
-      ? 'inc'
-      : state.recipe.exclude.includes(id)
-        ? 'exc'
-        : ''
-    if (st) b.dataset.state = st
-    else delete b.dataset.state
-    // Untouched chips preview the sign the active tab would give them, so the
-    // consequence of a tap is visible before you make it.
-    const sign = b.querySelector('.sign')
-    if (sign) sign.textContent = st === 'inc' ? '＋' : st === 'exc' ? '−' : state.pickMode === 'exc' ? '−' : '＋'
+// Say which operation emptied it, and offer the control that undoes the damage.
+const explainEmpty = (chain, pool) => {
+  const status = $('status')
+  status.classList.add('warn')
+  const { mode, include, rarity } = state.recipe
+
+  let culprit = null
+  let prev = null
+  for (const st of chain) {
+    if (prev !== null && st.n < prev / 4) culprit = st
+    prev = st.n
   }
+
+  const why = document.createElement('div')
+  why.className = 'why'
+  const first = chain[0]
+
+  if (culprit && /common/.test(culprit.label)) {
+    why.textContent = `${culprit.label} cut it to ${culprit.n.toLocaleString()} words — only ${pool.length} syllables, too few to build from.`
+    why.append(fixButton('loosen it to ≥ 6', () => {
+      state.recipe.rarity = 6
+      renderControls()
+      roll()
+    }))
+  } else if (mode === 'all' && include.length > 1) {
+    why.textContent = `Those ${include.length} authors share only ${first.n.toLocaleString()} words, and ${pool.length} syllables is too few to build from.`
+    why.append(fixButton('use ∪ UNION instead', () => {
+      state.recipe.mode = 'any'
+      renderControls()
+      roll()
+    }))
+  } else {
+    why.textContent = `Only ${pool.length} syllables in this set — too few to build from.`
+    why.append(fixButton('start over', resetAll))
+  }
+  status.append(why)
 }
 
-const setPickMode = (mode) => {
-  state.pickMode = mode
-  for (const b of $('pickTabs').children) b.classList.toggle('on', b.dataset.mode === mode)
-  $('sheetTitle').textContent = mode === 'exc' ? 'Authors to exclude' : 'Authors to include'
-  $('pickHint').innerHTML =
-    mode === 'exc'
-      ? 'Tap an author to <b>subtract</b> their words (∖ difference). Tap again to undo.'
-      : 'Tap an author to <b>add</b> them to the include set. Tap again to undo.'
-  syncChips()
+const fixButton = (label, fn) => {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.className = 'fix'
+  b.textContent = label
+  b.onclick = fn
+  return b
 }
 
 const toast = (msg) => {
@@ -387,8 +581,12 @@ const poolFor = () => {
   const key = `${mode}|${include.join(',')}|${exclude.join(',')}|${rarity}`
   const hit = state.poolCache.get(key)
   if (hit) return hit
-  const sel = selectWords(state.corpus, state.recipe)
-  const val = { words: countBits(sel), pool: syllablePool(state.corpus, sel) }
+  const stages = selectStages(state.corpus, state.recipe)
+  const val = {
+    words: countBits(stages.final),
+    pool: syllablePool(state.corpus, stages.final),
+    stages,
+  }
   state.poolCache.set(key, val)
   return val
 }
@@ -400,37 +598,24 @@ const roll = () => {
   status.classList.remove('warn')
 
   if (!state.recipe.include.length) {
-    status.textContent = 'Pick at least one author.'
-    showEmpty('choose authors', () => openSheet())
+    status.textContent = 'Tap ＋ next to an author below.'
+    status.classList.add('warn')
+    renderProof(null)
     return
   }
 
-  const { words, pool } = poolFor()
+  const { pool, stages } = poolFor()
+  state.stages = stages
+  renderProof(stages)
+  $('traceBox').hidden = true
+
   const names = generateNames(state.corpus, pool, { count: BATCH, seed: state.seed })
 
-  status.innerHTML = `set holds <b>${words.toLocaleString()}</b> words → <b>${pool.length.toLocaleString()}</b> syllables`
+  renderStatus(pool, names.length)
   $('footRecipe').textContent = recipeText()
   writeUrl()
 
-  if (!names.length) {
-    status.classList.add('warn')
-    if (state.recipe.mode === 'all' && state.recipe.include.length > 1) {
-      status.textContent = 'That intersection is empty — these authors share almost no rare words.'
-      showEmpty('switch to ∪ UNION', () => {
-        state.recipe.mode = 'any'
-        renderPills()
-        roll()
-      })
-    } else {
-      status.textContent = 'Every word got subtracted.'
-      showEmpty('weaken the ∖ difference', () => {
-        state.recipe.rarity = state.recipe.rarity === 0 ? 0 : state.recipe.rarity + 4
-        renderPills()
-        roll()
-      })
-    }
-    return
-  }
+  if (!names.length) return
 
   const rtext = recipeText()
   names.forEach((n, i) => {
@@ -439,6 +624,13 @@ const roll = () => {
     card.type = 'button'
     card.style.animationDelay = `${Math.min(i, 12) * 14}ms`
     card.append(document.createTextNode(n.name))
+
+    // The assembly, printed on every card: proof of the remix step without
+    // having to interact with anything.
+    const parts = document.createElement('span')
+    parts.className = 'parts'
+    parts.textContent = n.parts.join(' + ')
+    card.append(parts)
 
     const star = document.createElement('span')
     star.className = 'star' + (state.kept.some((k) => k.name === n.name) ? ' on' : '')
@@ -457,23 +649,11 @@ const roll = () => {
       card.classList.add('copied')
       setTimeout(() => card.classList.remove('copied'), 700)
       toast(`copied ${n.name}`)
+      renderTrace(n) // and show which real words it was built from
     }
     card.append(star)
     results.append(card)
   })
-}
-
-const showEmpty = (label, fn) => {
-  const d = document.createElement('div')
-  d.className = 'empty-state'
-  d.append(document.createTextNode('No names from that combination.'))
-  const b = document.createElement('button')
-  b.className = 'ghost'
-  b.type = 'button'
-  b.textContent = label
-  b.onclick = fn
-  d.append(document.createElement('br'), b)
-  $('results').append(d)
 }
 
 const reroll = () => {
@@ -481,21 +661,9 @@ const reroll = () => {
   roll()
 }
 
-// ---------------------------------------------------------------- sheets
-
-const openSheet = (mode = 'inc') => {
-  $('sheet').hidden = false
-  setPickMode(mode)
-  renderSummary()
-}
-const closeSheet = () => {
-  $('sheet').hidden = true
-}
-
 // ---------------------------------------------------------------- wiring
 
 const wire = () => {
-  for (const el of document.querySelectorAll('[data-close]')) el.onclick = closeSheet
   for (const el of document.querySelectorAll('[data-close-kept]'))
     el.onclick = () => ($('keptSheet').hidden = true)
 
@@ -505,39 +673,13 @@ const wire = () => {
   }
 
   $('rollBtn').onclick = reroll
-
-  $('pickTabs').onclick = (e) => {
-    const b = e.target.closest('button')
-    if (b) setPickMode(b.dataset.mode)
-  }
-
-  // No hidden cycle: a tap puts the author in whichever set the tab names, or
-  // takes them out of it. Which set that is, is stated at the top of the sheet.
-  $('chipGroups').onclick = (e) => {
-    const chip = e.target.closest('.chip')
-    if (!chip) return
-    const id = chip.dataset.id
-    const { include, exclude } = state.recipe
-    const bucket = state.pickMode === 'exc' ? exclude : include
-    const other = state.pickMode === 'exc' ? include : exclude
-
-    const oi = other.indexOf(id)
-    if (oi >= 0) other.splice(oi, 1)
-    const bi = bucket.indexOf(id)
-    if (bi >= 0) bucket.splice(bi, 1)
-    else bucket.push(id)
-
-    syncChips()
-    renderSummary()
-    renderPills()
-    roll()
-  }
+  $('resetBtn').onclick = resetAll
 
   $('modeSeg').onclick = (e) => {
     const b = e.target.closest('button')
     if (!b) return
     state.recipe.mode = b.dataset.mode
-    renderPills()
+    renderControls()
     roll()
   }
 
@@ -545,7 +687,7 @@ const wire = () => {
     const b = e.target.closest('button')
     if (!b) return
     state.recipe.rarity = Number(b.dataset.rarity)
-    renderPills()
+    renderControls()
     roll()
   }
 }
@@ -564,8 +706,8 @@ const main = async () => {
   }
   readUrl()
   wire()
-  renderChips()
-  renderPills()
+  renderAuthors()
+  renderControls()
   saveKept()
   $('boot').remove()
   $('app').hidden = false

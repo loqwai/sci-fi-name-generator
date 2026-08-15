@@ -11,7 +11,9 @@
     "sample": "node scripts/sample.mjs",
     "tune": "node scripts/tune.mjs",
     "serve": "node scripts/serve.mjs",
-    "deploy": "wrangler pages deploy dist --project-name nameforge"
+    "deploy": "wrangler pages deploy dist --project-name nameforge",
+    "test": "node --test scripts/setmath.test.mjs",
+    "verify": "node scripts/verify.mjs"
   },
   "devDependencies": {
     "pronounceable": "^1.0.1"

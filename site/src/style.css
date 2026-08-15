@@ -260,13 +260,13 @@ h1 {
 .expr {
   margin: 0 0 6px;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 12.5px;
+  line-height: 1.4;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 9px 11px;
+  padding: 8px 10px;
   overflow-wrap: anywhere;
 }
 .expr .op {
@@ -357,7 +357,7 @@ h1 {
 }
 .seg button {
   flex: 1;
-  min-height: 40px;
+  min-height: 36px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -400,16 +400,16 @@ h1 {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 15px 34px 15px 13px;
+  padding: 11px 32px 11px 12px;
   text-align: left;
   font: inherit;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--ink);
   letter-spacing: 0.01em;
   cursor: pointer;
   overflow-wrap: anywhere;
-  min-height: 58px;
+  min-height: 52px;
   transition: transform 0.09s ease, border-color 0.15s ease;
   animation: rise 0.26s ease both;
 }
@@ -676,4 +676,307 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ================================================================ v3
+   The selection mechanism, third attempt. The first two put a mode or a
+   panel between him and "make this author negative"; he reported the same
+   confusion both times. So: one flat list, always on screen, every author
+   carrying its own + and - . One tap, nothing to open, no mode to be in. */
+
+.controls {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 9px;
+}
+.ctl-label {
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  font-weight: 800;
+  color: var(--ink);
+}
+.ctl-label .muted {
+  color: var(--dim);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.ctl .ctl-label {
+  margin-bottom: 5px;
+  display: block;
+}
+.ctl .gloss {
+  margin: 0;
+}
+
+.authors {
+  margin-bottom: 10px;
+}
+.authors-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.key {
+  font-size: 12px;
+  color: var(--dim);
+}
+.key .k-inc {
+  color: var(--yes);
+}
+.key .k-exc {
+  color: var(--no);
+}
+
+/* Capped height with its own scroll: the whole list stays reachable without
+   pushing the names -- the actual product -- off the first screen. */
+.author-list {
+  max-height: 196px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 7px;
+  overscroll-behavior: contain;
+}
+.author-group {
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+  font-weight: 800;
+  padding: 7px 4px 3px;
+}
+.author-group:first-child {
+  padding-top: 2px;
+}
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 3px;
+}
+.author-row .nm {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.author-row button {
+  flex: none;
+  width: 40px;
+  height: 35px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--dim);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+.author-row button:active {
+  transform: scale(0.94);
+}
+.author-row .plus.on {
+  background: var(--yes);
+  border-color: var(--yes);
+  color: #08301f;
+}
+.author-row .minus.on {
+  background: var(--no);
+  border-color: var(--no);
+  color: #3a0710;
+}
+/* State is also carried by the row itself and by the name's own styling, so it
+   survives a dim screen and colourblindness. */
+.author-row[data-state='inc'] {
+  background: rgba(92, 230, 164, 0.09);
+  border-radius: 10px;
+}
+.author-row[data-state='exc'] {
+  background: rgba(255, 107, 129, 0.09);
+  border-radius: 10px;
+}
+.author-row[data-state='exc'] .nm {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  color: var(--no);
+}
+.author-row[data-state='inc'] .nm {
+  color: var(--yes);
+  font-weight: 800;
+}
+
+/* ---------------------------------------------------------------- proof */
+.proof {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.proof > .ctl-label {
+  display: block;
+  margin-bottom: 9px;
+}
+.proof-stage {
+  margin-bottom: 12px;
+}
+.stage-head {
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+.stage-head .n {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.stage-head.kept .n {
+  color: var(--yes);
+}
+.stage-head.cut .n {
+  color: var(--no);
+}
+.wordbox {
+  max-height: 132px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+.wordbox.cut {
+  color: #8a6a72;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.trace {
+  background: var(--bg-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  padding: 11px;
+  margin-bottom: 14px;
+}
+.trace h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--ink);
+}
+.trace h4 span {
+  color: var(--accent);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.trace-syl {
+  margin-bottom: 7px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.trace-syl b {
+  display: inline-block;
+  min-width: 44px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  color: var(--gold);
+}
+.trace-syl i {
+  color: var(--dim);
+  font-style: normal;
+}
+
+/* the syllable breakdown printed on every name card */
+.name .parts {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #6f6f8c;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+/* clearing, as its own visible control */
+.key .k-clr {
+  color: var(--gold);
+}
+.author-row .clr {
+  width: 34px;
+  height: 33px;
+  font-size: 13px;
+  color: var(--gold);
+  border-color: rgba(255, 209, 102, 0.4);
+  background: rgba(255, 209, 102, 0.1);
+}
+.reset {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--dim);
+  border-radius: 999px;
+  padding: 7px 12px;
+  min-height: 36px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.reset:active {
+  background: rgba(167, 139, 250, 0.18);
+  color: var(--ink);
+}
+.authors-head {
+  flex-wrap: wrap;
+}
+
+/* jump to the evidence without scrolling past two dozen cards */
+.status .jump {
+  color: var(--accent);
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+/* per-stage counts: the set size after every operation, always on screen */
+.status .stage b {
+  color: var(--ink);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.status .stage.zero b {
+  color: var(--no);
+}
+.status .arrow {
+  color: #5a5a75;
+}
+.status .why {
+  margin-top: 8px;
+  padding: 10px 11px;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: rgba(255, 209, 102, 0.08);
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.status.warn .why b {
+  color: var(--gold);
+}
+.fix {
+  display: block;
+  margin-top: 9px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--gold);
+  color: #2a1d00;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0 16px;
+  cursor: pointer;
 }
