@@ -74,11 +74,14 @@ await step('roll again produces a different batch', async () => {
   if (second.join() === first.join()) throw new Error('identical batch')
 })
 
-await step('tap a name copies it', async () => {
+await step('tap a name copies it (clipboard actually holds it)', async () => {
+  const target = (await names())[0]
   await page.click('.name')
   await page.waitForSelector('.toast.show', { timeout: 3000 })
   const t = await page.textContent('#toast')
   if (!/copied/.test(t)) throw new Error(`toast said "${t}"`)
+  const clip = await page.evaluate(() => navigator.clipboard.readText())
+  if (clip !== target) throw new Error(`clipboard held "${clip}", expected "${target}"`)
 })
 
 await step('star keeps a name', async () => {
