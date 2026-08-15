@@ -10,7 +10,7 @@ import { parseCorpus, selectWords, syllablePool, generateNames, countBits } from
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const corpus = parseCorpus(
-  gunzipSync(await readFile(join(__dirname, '..', 'dist', 'corpus.bin.gz'))).buffer,
+  await readFile(join(__dirname, '..', 'dist', 'corpus.bin')).buffer,
 )
 
 const RECIPES = [

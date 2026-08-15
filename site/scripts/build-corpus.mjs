@@ -234,7 +234,21 @@ const main = async () => {
     params: { [constants.BROTLI_PARAM_QUALITY]: 11, [constants.BROTLI_PARAM_SIZE_HINT]: raw.length },
   })
 
-  await writeFile(join(OUT, 'corpus.bin.gz'), gz)
+  // Delivery, decided by measurement rather than taste:
+  //
+  //   raw .bin        1,051 KB on the wire -- Cloudflare does not compress
+  //                   application/octet-stream at all.
+  //   gzip .bin       378 KB, but the browser receives gzip bytes (the edge
+  //                   re-compresses and eats our Content-Encoding), so the app
+  //                   must inflate them via DecompressionStream -- which Safari
+  //                   only gained in 16.4. Verified to hard-fail without it.
+  //   base64 .txt     text/plain, so the edge brotli-compresses it and EVERY
+  //                   browser inflates transparently. atob() costs ~15 ms.
+  //
+  // The last one wins: no compatibility cliff, and the wire cost is reported
+  // below so the choice stays honest.
+  await writeFile(join(OUT, 'corpus.bin'), gz)
+  await writeFile(join(OUT, 'corpus.b64.txt'), raw.toString('base64'))
 
   const dfHist = {}
   for (let k = 0; k <= 6; k++) dfHist[k] = 0

@@ -27,19 +27,46 @@ const state = {
 
 // ---------------------------------------------------------------- loading
 
-const loadCorpus = async () => {
-  const res = await fetch('./corpus.bin.gz', { cache: 'force-cache' })
-  if (!res.ok) throw new Error(`corpus ${res.status}`)
+// Two deliveries of the same bytes, cheapest first. See build-corpus.mjs for
+// the measurements; briefly:
+//
+//   corpus.bin      369 KB. Gzip, inflated here. Cloudflare will not compress
+//                   octet-stream and re-compresses in transport, so the bytes
+//                   arrive still gzipped and we need DecompressionStream --
+//                   Safari 16.4+, Firefox 113+.
+//   corpus.b64.txt  468 KB. base64 text/plain, so the edge brotli-compresses it
+//                   and every browser inflates transparently. Costs ~100 KB
+//                   more, so it is only used where the cheap path cannot run.
+const fromGzip = async () => {
+  const res = await fetch('./corpus.bin', { cache: 'force-cache' })
+  if (!res.ok) throw new Error(`corpus.bin ${res.status}`)
   let buf = await res.arrayBuffer()
-
-  // Be robust to the edge deciding to decompress for us: if the payload is
-  // already the raw container, skip gunzip; otherwise inflate it ourselves.
   const magic = new TextDecoder().decode(new Uint8Array(buf, 0, Math.min(8, buf.byteLength)))
   if (magic !== 'NAMEGEN2') {
     const ds = new DecompressionStream('gzip')
     buf = await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer()
   }
   return parseCorpus(buf)
+}
+
+const fromBase64 = async () => {
+  const res = await fetch('./corpus.b64.txt', { cache: 'force-cache' })
+  if (!res.ok) throw new Error(`corpus.b64.txt ${res.status}`)
+  const bin = atob((await res.text()).trim())
+  const u8 = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i)
+  return parseCorpus(u8.buffer)
+}
+
+const loadCorpus = async () => {
+  if (typeof DecompressionStream === 'function') {
+    try {
+      return await fromGzip()
+    } catch (e) {
+      console.warn('gzip corpus failed, falling back to base64', e)
+    }
+  }
+  return fromBase64()
 }
 
 // ---------------------------------------------------------------- recipe url

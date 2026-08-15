@@ -9,7 +9,7 @@ import { parseCorpus, selectWords, syllablePool, generateNames } from '../src/en
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const corpus = parseCorpus(
-  gunzipSync(await readFile(join(__dirname, '..', 'dist', 'corpus.bin.gz'))).buffer,
+  await readFile(join(__dirname, '..', 'dist', 'corpus.bin')).buffer,
 )
 
 const recipe = { include: ['stoker', 'lovecraft'], mode: 'all', exclude: [], rarity: 2 }

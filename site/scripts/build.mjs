@@ -10,7 +10,7 @@ const SRC = join(__dirname, '..', 'src')
 const DIST = join(__dirname, '..', 'dist')
 
 await mkdir(DIST, { recursive: true })
-const files = ['index.html', 'style.css', 'app.js', 'engine.js']
+const files = ['index.html', 'style.css', 'app.js', 'engine.js', '_headers']
 for (const f of files) await copyFile(join(SRC, f), join(DIST, f))
 
 const sizes = []
