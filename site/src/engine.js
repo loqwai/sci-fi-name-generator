@@ -8,6 +8,41 @@
 //   4. keep it if it is >= 5 chars and passes pronounceable.test
 // His accepted outputs were `tornoromic` and `quarbet`.
 
+// ---------------------------------------------------------------- the default
+//
+// What the first screen shows before anyone taps anything. It lives here, next
+// to the engine, rather than in app.js, so the test suite can assert on the
+// SAME object the app boots with -- a copy in the test would drift and pass
+// while the real default rotted.
+//
+// Chosen by reading output, not by reasoning about it. Three things decided it:
+//
+//   UNION, not intersection. `A ∩ B ∖ common` is structurally a proper-noun
+//   machine: the words two authors share are ordinary English, so whatever
+//   survives the common-English filter is the residue -- surnames, places,
+//   admin vocabulary. The old default really did serve `gertrude, stafford,
+//   presidency, fairfield, thompson, sydney, webb`. Union has the opposite
+//   shape: it keeps each author's own distinctive words.
+//
+//   It also fails safe. From a union, every ＋ tap makes the set BIGGER. From
+//   an intersection every tap makes it smaller, which is how he arrived at an
+//   empty screen and concluded the tool was broken.
+//
+//   ≥1, not ≥2. The strictest common-English setting is only dangerous on an
+//   intersection (that is what gutted the four-way to 2 words). On a union of
+//   16,680 words it is the setting that strips English morphology out of the
+//   syllable pool -- ≥2 leaves enough -tion/-ness/-ship behind to produce
+//   "untruness" and "manchoship". ≥1 gives `thalis, narai, terskiel, orros`.
+//
+//   Lovecraft ∪ the Kabbalah, because a grimoire is the Necronomicon's own
+//   register, and it keeps the project's anchor author on the first screen.
+export const DEFAULT_RECIPE = {
+  include: ['lovecraft', 'kabbalah'],
+  exclude: [],
+  mode: 'any',
+  rarity: 1,
+}
+
 // ---------------------------------------------------------------- parsing
 
 const MAGIC = 'NAMEGEN2'

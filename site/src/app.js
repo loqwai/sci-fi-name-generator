@@ -1,4 +1,5 @@
 import {
+  DEFAULT_RECIPE,
   parseCorpus,
   selectWords,
   selectStages,
@@ -11,14 +12,6 @@ import {
 
 const $ = (id) => document.getElementById(id)
 const BATCH = 24
-
-// His known-good recipe, so the very first screen already produces good names.
-const DEFAULT_RECIPE = {
-  include: ['lovecraft', 'stoker'],
-  exclude: [],
-  mode: 'all',
-  rarity: 2,
-}
 
 // Deep copy, always. A shallow spread shares the include/exclude arrays with
 // DEFAULT_RECIPE, so every tap quietly rewrote the default and "start over"
@@ -94,7 +87,10 @@ const readUrl = () => {
     include: inc,
     exclude: pick('x'),
     mode: h.get('m') === 'any' ? 'any' : 'all',
-    rarity: Math.max(0, Math.min(63, parseInt(h.get('r') ?? '2', 10) || 0)),
+    rarity: Math.max(
+      0,
+      Math.min(63, parseInt(h.get('r') ?? String(DEFAULT_RECIPE.rarity), 10) || 0),
+    ),
   }
   const s = parseInt(h.get('s') ?? '', 10)
   if (Number.isFinite(s)) state.seed = s

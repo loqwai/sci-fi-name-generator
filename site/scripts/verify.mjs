@@ -6,6 +6,10 @@ import { mkdir } from 'fs/promises'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
+// Imported, not hardcoded: these steps used to name the default's authors
+// literally, so changing the default broke the harness rather than testing it.
+import { DEFAULT_RECIPE } from '../src/engine.js'
+
 const pw = await import(
   pathToFileURL('D:/projects/paper-cranes/node_modules/playwright/index.js').href
 )
@@ -105,7 +109,7 @@ await step('rarity dial changes the pool', async () => {
   await page.waitForTimeout(500)
   const after = await page.textContent('#status')
   if (before === after) throw new Error('status unchanged')
-  await page.click('#raritySeg button[data-rarity="2"]')
+  await page.click(`#raritySeg button[data-rarity="${DEFAULT_RECIPE.rarity}"]`)
   await page.waitForTimeout(500)
 })
 
@@ -273,7 +277,8 @@ await step('HIS BUG: a run-dry result names the stage that emptied it', async ()
 await step('UNION of PKD and Asimov is never empty in the UI', async () => {
   await page.click('#resetBtn')
   await page.waitForTimeout(300)
-  for (const id of ['lovecraft', 'stoker']) {
+  // Clear whatever the default put in, whatever that happens to be.
+  for (const id of [...DEFAULT_RECIPE.include, ...DEFAULT_RECIPE.exclude]) {
     const row = page.locator(`.author-row[data-id="${id}"]`)
     await row.scrollIntoViewIfNeeded()
     await row.locator('.clr').click()
@@ -297,12 +302,21 @@ await step('UNION of PKD and Asimov is never empty in the UI', async () => {
 })
 
 await step('operator switches between ∩ and ∪', async () => {
-  await page.click('#modeSeg button[data-mode="any"]')
+  // Drive it away from the default first, then back, so this proves both
+  // directions no matter which operator the default starts on.
+  const other = DEFAULT_RECIPE.mode === 'any' ? 'all' : 'any'
+  const sym = { any: '∪', all: '∩' }
+
+  await page.click(`#modeSeg button[data-mode="${other}"]`)
   await page.waitForTimeout(600)
-  if (!/∪/.test(await page.textContent('#expr'))) throw new Error('did not switch to union')
-  if (!(await names()).length) throw new Error('no names in union mode')
-  await page.click('#modeSeg button[data-mode="all"]')
+  if (!new RegExp(sym[other]).test(await page.textContent('#expr')))
+    throw new Error(`did not switch to ${sym[other]}`)
+
+  await page.click(`#modeSeg button[data-mode="${DEFAULT_RECIPE.mode}"]`)
   await page.waitForTimeout(600)
+  if (!new RegExp(sym[DEFAULT_RECIPE.mode]).test(await page.textContent('#expr')))
+    throw new Error(`did not switch back to ${sym[DEFAULT_RECIPE.mode]}`)
+  if (!(await names()).length) throw new Error('no names after switching operator')
 })
 
 await step('recipe survives a reload via the url', async () => {

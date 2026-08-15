@@ -15,7 +15,7 @@ import { readFile } from 'node:fs/promises'
 import { gunzipSync } from 'node:zlib'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseCorpus, selectWords, selectStages, countBits, syllablePool, generateNames } from '../src/engine.js'
+import { DEFAULT_RECIPE, parseCorpus, selectWords, selectStages, countBits, syllablePool, generateNames } from '../src/engine.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const corpus = parseCorpus(gunzipSync(await readFile(join(__dirname, '..', 'dist', 'corpus.bin'))).buffer)
@@ -154,6 +154,74 @@ test('every single author on its own can still produce names', () => {
     if (!names.length) bad.push(id)
   }
   assert.deepEqual(bad, [], `these authors produced no names alone: ${bad.join(', ')}`)
+})
+
+// ---------------------------------------------------------------- the default
+//
+// The first screen is the demo: he opens this in front of people and hands over
+// the phone. With zero taps it has to be already full of names. An empty first
+// screen is the failure that started all of this -- he saw one, and reasonably
+// concluded the whole thing was broken.
+//
+// So these assert the SHIPPED default (imported, not copied) is nowhere near
+// running dry, with room to spare rather than a squeak past zero.
+
+const BATCH = 24 // must match BATCH in app.js
+
+test('THE DEFAULT RECIPE fills a whole batch, on every seed', () => {
+  const sel = selectWords(corpus, DEFAULT_RECIPE)
+  const pool = syllablePool(corpus, sel)
+
+  // Not one lucky seed: the app picks a random one on every load and on every
+  // ROLL AGAIN, so a default that only fills up sometimes is still broken.
+  for (const seed of [1, 2, 3, 12345, 777, 31337, 20260815, 424242, 999999, 8080]) {
+    const names = generateNames(corpus, pool, { count: BATCH, seed })
+    assert.equal(
+      names.length,
+      BATCH,
+      `default only made ${names.length}/${BATCH} names at seed ${seed}`,
+    )
+    for (const n of names) {
+      assert.ok(n.name.length >= 5, `"${n.name}" is too short to be a name`)
+      assert.ok(n.parts.length >= 2, `"${n.name}" was not assembled from syllables`)
+    }
+  }
+})
+
+test('THE DEFAULT RECIPE keeps headroom at every stage', () => {
+  const s = selectStages(corpus, DEFAULT_RECIPE)
+  const pool = syllablePool(corpus, s.final)
+
+  // Real values at the time of writing: 16,680 → 1,494 words → 3,945 syllables.
+  // These floors sit far below that but far above "survived by two words", so
+  // they fail on a genuine collapse rather than on ordinary corpus drift.
+  assert.ok(countBits(s.base) > 5000, `base set is only ${countBits(s.base)} words`)
+  assert.ok(countBits(s.final) > 500, `only ${countBits(s.final)} words survive the filters`)
+  assert.ok(pool.length > 1500, `only ${pool.length} syllables to build from`)
+
+  // generateNames gives up entirely below 8 syllables. State the margin.
+  assert.ok(pool.length > 8 * 20, 'the syllable pool is close to the generator floor')
+})
+
+test('THE DEFAULT RECIPE fails safe: every ＋ tap makes the set bigger', () => {
+  // Why the default is a union. From an intersection each added author shrinks
+  // the set toward empty; from a union it can only grow, so no single tap from
+  // the first screen can land him back on a blank result.
+  assert.equal(DEFAULT_RECIPE.mode, 'any', 'default must be a union to fail safe')
+
+  const before = countBits(selectWords(corpus, DEFAULT_RECIPE))
+  for (const id of IDS) {
+    if (DEFAULT_RECIPE.include.includes(id)) continue
+    const r = { ...DEFAULT_RECIPE, include: [...DEFAULT_RECIPE.include, id] }
+    const after = countBits(selectWords(corpus, r))
+    assert.ok(after >= before, `adding ${id} shrank the set: ${before} → ${after}`)
+
+    const names = generateNames(corpus, syllablePool(corpus, selectWords(corpus, r)), {
+      count: BATCH,
+      seed: 7,
+    })
+    assert.equal(names.length, BATCH, `+${id} from the default made only ${names.length} names`)
+  }
 })
 
 test('a deep intersection may legitimately run dry — and the stages say so', () => {
