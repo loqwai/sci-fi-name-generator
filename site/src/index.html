@@ -31,36 +31,36 @@
       </header>
 
       <section class="recipe">
-        <div class="recipe-line">
-          <span class="lead">sounds like</span>
+        <div class="setgroup yes">
+          <div class="setname"><span class="num">1</span> INCLUDE</div>
+          <div class="seg" id="modeSeg">
+            <button type="button" data-mode="all" class="on">∩ INTERSECTION</button>
+            <button type="button" data-mode="any">∪ UNION</button>
+          </div>
+          <p class="gloss" id="incGloss">only words <b>every</b> one of these authors used</p>
+
           <div id="incPills" class="pills"></div>
         </div>
-        <div class="recipe-line" id="excLine" hidden>
-          <span class="lead lead-no">but not</span>
+
+        <div class="setgroup no">
+          <div class="setname"><span class="num">2</span> DIFFERENCE ∖ <span class="muted">exclude authors</span></div>
+          <p class="gloss">their words are <b>subtracted</b> from the set above</p>
           <div id="excPills" class="pills"></div>
         </div>
-        <button id="pickBtn" class="pick" type="button">＋ choose authors</button>
-      </section>
 
-      <section class="dials">
-        <div class="dial" id="modeDial" hidden>
-          <div class="dial-label">two authors?</div>
-          <div class="seg" id="modeSeg">
-            <button type="button" data-mode="all" class="on">where they overlap</button>
-            <button type="button" data-mode="any">mixed together</button>
-          </div>
-        </div>
-        <div class="dial">
-          <div class="dial-label">how strange?</div>
+        <div class="setgroup no">
+          <div class="setname"><span class="num">3</span> DIFFERENCE ∖ <span class="muted">common English</span></div>
+          <p class="gloss" id="rarityGloss"></p>
           <div class="seg" id="raritySeg">
-            <button type="button" data-rarity="1">unheard of</button>
-            <button type="button" data-rarity="2" class="on">strange</button>
-            <button type="button" data-rarity="6">odd</button>
-            <button type="button" data-rarity="0">anything</button>
+            <button type="button" data-rarity="1">≥ 1</button>
+            <button type="button" data-rarity="2" class="on">≥ 2</button>
+            <button type="button" data-rarity="6">≥ 6</button>
+            <button type="button" data-rarity="0">off</button>
           </div>
         </div>
       </section>
 
+      <p id="expr" class="expr"></p>
       <p id="status" class="status"></p>
 
       <section id="results" class="results"></section>
@@ -80,12 +80,27 @@
       <div class="sheet-scrim" data-close></div>
       <div class="sheet-body">
         <div class="sheet-head">
-          <strong>Choose authors</strong>
+          <strong id="sheetTitle">Authors</strong>
           <button class="ghost" type="button" data-close>done</button>
         </div>
-        <p class="sheet-hint">
-          tap once = <b class="yes">sounds like</b> · twice = <b class="no">but not</b> · again to clear
-        </p>
+
+        <div class="tabs" id="pickTabs">
+          <button type="button" data-mode="inc" class="on">＋ INCLUDE</button>
+          <button type="button" data-mode="exc">− EXCLUDE</button>
+        </div>
+        <p class="sheet-hint" id="pickHint"></p>
+
+        <div class="summary">
+          <div class="summary-row yes">
+            <span class="summary-label">＋ INCLUDE</span>
+            <div id="sumInc" class="pills"></div>
+          </div>
+          <div class="summary-row no">
+            <span class="summary-label">− EXCLUDE</span>
+            <div id="sumExc" class="pills"></div>
+          </div>
+        </div>
+
         <div id="chipGroups" class="chip-groups"></div>
       </div>
     </div>

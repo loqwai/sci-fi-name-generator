@@ -133,26 +133,63 @@ h1 {
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 12px;
-  margin-bottom: 12px;
-}
-.recipe-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
+  padding: 11px;
   margin-bottom: 9px;
 }
-.lead {
-  flex: none;
-  font-size: 12.5px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--yes);
-  padding-top: 8px;
-  font-weight: 700;
+/* Each set operation is its own labelled, numbered block. Include vs exclude is
+   carried by position, a number, a word and a +/- glyph -- never by colour
+   alone, which is useless in a dark room and to colourblind friends. */
+.setgroup {
+  border-left: 3px solid var(--line);
+  padding: 1px 0 1px 10px;
+  margin-bottom: 11px;
 }
-.lead-no {
-  color: var(--no);
+.setgroup:last-child {
+  margin-bottom: 0;
+}
+.setgroup.yes {
+  border-left-color: var(--yes);
+}
+.setgroup.no {
+  border-left-color: var(--no);
+}
+.setname {
+  font-size: 12.5px;
+  letter-spacing: 0.07em;
+  font-weight: 800;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+.setname .num {
+  display: inline-grid;
+  place-content: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.setname .muted {
+  color: var(--dim);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.gloss {
+  margin: 0 0 7px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--dim);
+}
+.gloss b {
+  color: var(--ink);
+  font-weight: 700;
 }
 .pills {
   display: flex;
@@ -161,19 +198,38 @@ h1 {
   flex: 1;
 }
 .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 15px;
-  font-weight: 600;
+  padding: 5px 5px 5px 12px;
+  font-size: 14.5px;
+  font-weight: 700;
   border: 1px solid;
+  min-height: 38px;
   background: rgba(92, 230, 164, 0.11);
   border-color: rgba(92, 230, 164, 0.45);
   color: var(--yes);
+}
+.pill .sign {
+  font-weight: 900;
 }
 .pill.no {
   background: rgba(255, 107, 129, 0.11);
   border-color: rgba(255, 107, 129, 0.45);
   color: var(--no);
+}
+.pill .x {
+  border: 0;
+  background: rgba(255, 255, 255, 0.09);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  flex: none;
 }
 .pill.empty {
   background: transparent;
@@ -181,21 +237,96 @@ h1 {
   border-style: dashed;
   color: var(--dim);
   font-weight: 500;
+  padding: 7px 13px;
 }
-.pick {
-  width: 100%;
-  min-height: 46px;
-  border-radius: 11px;
-  border: 1px dashed var(--line);
-  background: transparent;
+/* the add button lives inline with the pills, in the group it adds to */
+.addbtn {
+  border-radius: 999px;
+  padding: 5px 14px;
+  min-height: 38px;
+  border: 1px dashed var(--accent);
+  background: rgba(167, 139, 250, 0.1);
   color: var(--accent);
   font: inherit;
-  font-weight: 700;
-  font-size: 15.5px;
+  font-size: 14.5px;
+  font-weight: 800;
   cursor: pointer;
 }
-.pick:active {
-  background: rgba(167, 139, 250, 0.12);
+.addbtn:active {
+  background: rgba(167, 139, 250, 0.25);
+}
+
+/* the live set expression -- his own notation from scratch.test.js */
+.expr {
+  margin: 0 0 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 11px;
+  overflow-wrap: anywhere;
+}
+.expr .op {
+  color: var(--accent);
+  font-weight: 700;
+}
+.expr .ex {
+  color: var(--no);
+}
+
+/* sheet tabs + the two membership zones */
+.tabs {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 11px;
+}
+.tabs button {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--dim);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.tabs button[data-mode='inc'].on {
+  background: rgba(92, 230, 164, 0.17);
+  border-color: var(--yes);
+  color: var(--yes);
+}
+.tabs button[data-mode='exc'].on {
+  background: rgba(255, 107, 129, 0.17);
+  border-color: var(--no);
+  color: var(--no);
+}
+.summary {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.summary-row {
+  border-left: 3px solid var(--line);
+  padding-left: 10px;
+}
+.summary-row.yes {
+  border-left-color: var(--yes);
+}
+.summary-row.no {
+  border-left-color: var(--no);
+}
+.summary-label {
+  display: block;
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  color: var(--dim);
+  margin-bottom: 5px;
 }
 
 /* ---------------------------------------------------------------- dials */
@@ -220,18 +351,23 @@ h1 {
   border-radius: 11px;
   padding: 5px;
 }
+.seg {
+  margin-bottom: 7px;
+  padding: 4px;
+}
 .seg button {
   flex: 1;
-  min-height: 42px;
+  min-height: 40px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--dim);
   font: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  padding: 6px 4px;
+  padding: 6px 3px;
 }
 .seg button.on {
   background: var(--accent);
@@ -241,7 +377,7 @@ h1 {
 
 /* ---------------------------------------------------------------- status */
 .status {
-  margin: 0 0 12px;
+  margin: 0 0 9px;
   font-size: 13.5px;
   color: var(--dim);
   min-height: 19px;
@@ -439,15 +575,28 @@ h1 {
   align-items: center;
   gap: 6px;
 }
+/* State is spelled out with a glyph and a border weight as well as colour. */
+.chip .sign {
+  font-weight: 900;
+  font-size: 16px;
+  opacity: 0.45;
+}
 .chip[data-state='inc'] {
   background: rgba(92, 230, 164, 0.15);
   border-color: var(--yes);
+  border-width: 2px;
   color: var(--yes);
 }
 .chip[data-state='exc'] {
   background: rgba(255, 107, 129, 0.15);
   border-color: var(--no);
+  border-width: 2px;
   color: var(--no);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+.chip[data-state] .sign {
+  opacity: 1;
 }
 .chip:active {
   transform: scale(0.97);

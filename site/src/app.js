@@ -23,6 +23,7 @@ const state = {
   seed: (Math.random() * 1e9) | 0,
   kept: [],
   poolCache: new Map(),
+  pickMode: 'inc', // which set the picker is currently editing
 }
 
 // ---------------------------------------------------------------- loading
@@ -103,46 +104,127 @@ const writeUrl = () => {
 
 const labelOf = (id) => state.corpus.meta.sources.find((s) => s.id === id)?.label ?? id
 
+// The recipe written the way he wrote it in scratch.test.js. Precise beats cute:
+// "where they overlap" could mean several things, "∩" means exactly one.
 const recipeText = () => {
   const { include, exclude, mode, rarity } = state.recipe
-  const glue = mode === 'all' ? ' ∩ ' : ' + '
-  let t = include.map(labelOf).join(glue) || 'nothing'
-  if (exclude.length) t += ' − ' + exclude.map(labelOf).join(' − ')
-  const r = { 0: 'anything', 1: 'unheard of', 2: 'strange' }[rarity] ?? 'odd'
-  return `${t} · ${r}`
+  const op = mode === 'all' ? ' ∩ ' : ' ∪ '
+  let t = include.map(labelOf).join(op) || '∅'
+  if (include.length > 1) t = `(${t})`
+  for (const id of exclude) t += ` ∖ ${labelOf(id)}`
+  if (rarity > 0) t += ` ∖ common(≥${rarity})`
+  return t
+}
+
+const renderExpr = () => {
+  const el = $('expr')
+  el.innerHTML = ''
+  const { include, exclude, mode, rarity } = state.recipe
+  const op = mode === 'all' ? ' ∩ ' : ' ∪ '
+  const add = (text, cls) => {
+    const s = document.createElement('span')
+    if (cls) s.className = cls
+    s.textContent = text
+    el.append(s)
+  }
+  if (include.length > 1) add('( ')
+  include.forEach((id, i) => {
+    if (i) add(op, 'op')
+    add(labelOf(id))
+  })
+  if (!include.length) add('∅')
+  if (include.length > 1) add(' )')
+  for (const id of exclude) {
+    add(' ∖ ', 'op')
+    add(labelOf(id), 'ex')
+  }
+  if (rarity > 0) {
+    add(' ∖ ', 'op')
+    add(`common(≥${rarity})`, 'ex')
+  }
 }
 
 // ---------------------------------------------------------------- rendering
 
-const renderPills = () => {
-  const inc = $('incPills')
-  const exc = $('excPills')
-  inc.innerHTML = ''
-  exc.innerHTML = ''
+// Build one pill: sign glyph + name + a remove button. The glyph means the
+// state survives a bad screen, bad light and colourblindness.
+const pillFor = (id, kind, onRemove) => {
+  const p = document.createElement('span')
+  p.className = 'pill' + (kind === 'exc' ? ' no' : '')
+  const sign = document.createElement('span')
+  sign.className = 'sign'
+  sign.textContent = kind === 'exc' ? '−' : '＋'
+  const name = document.createElement('span')
+  name.textContent = labelOf(id)
+  const x = document.createElement('button')
+  x.type = 'button'
+  x.className = 'x'
+  x.textContent = '✕'
+  x.setAttribute('aria-label', `remove ${labelOf(id)}`)
+  x.onclick = onRemove
+  p.append(sign, name, x)
+  return p
+}
 
-  if (!state.recipe.include.length) {
+const fillPills = (el, ids, kind, addLabel) => {
+  el.innerHTML = ''
+  for (const id of ids) {
+    el.append(
+      pillFor(id, kind, () => {
+        const arr = kind === 'exc' ? state.recipe.exclude : state.recipe.include
+        arr.splice(arr.indexOf(id), 1)
+        renderPills()
+        syncChips()
+        renderSummary()
+        roll()
+      }),
+    )
+  }
+  if (addLabel !== null) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'addbtn'
+    b.textContent = addLabel
+    b.onclick = () => openSheet(kind)
+    el.append(b)
+  }
+}
+
+const renderPills = () => {
+  const { include, exclude, mode, rarity } = state.recipe
+  fillPills($('incPills'), include, 'inc', include.length ? '＋ add' : '＋ add an author')
+  fillPills($('excPills'), exclude, 'exc', exclude.length ? '＋ add' : '＋ add an author to exclude')
+
+  $('incGloss').innerHTML =
+    mode === 'all'
+      ? 'only words <b>every</b> one of these authors used'
+      : 'every word used by <b>any</b> of these authors'
+
+  $('rarityGloss').innerHTML =
+    rarity === 0
+      ? 'nothing dropped — common words stay in'
+      : `drop words used in <b>${rarity} or more</b> of the 63 classics`
+
+  for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.mode === mode)
+  for (const b of $('raritySeg').children)
+    b.classList.toggle('on', Number(b.dataset.rarity) === rarity)
+  renderExpr()
+}
+
+// The two membership zones inside the picker: you can always see which set each
+// author currently sits in, without tapping anything.
+const renderSummary = () => {
+  const { include, exclude } = state.recipe
+  const none = (el, text) => {
     const d = document.createElement('span')
     d.className = 'pill empty'
-    d.textContent = 'pick an author →'
-    inc.append(d)
+    d.textContent = text
+    el.append(d)
   }
-  for (const id of state.recipe.include) {
-    const p = document.createElement('span')
-    p.className = 'pill'
-    p.textContent = labelOf(id)
-    inc.append(p)
-  }
-  $('excLine').hidden = !state.recipe.exclude.length
-  for (const id of state.recipe.exclude) {
-    const p = document.createElement('span')
-    p.className = 'pill no'
-    p.textContent = labelOf(id)
-    exc.append(p)
-  }
-  $('modeDial').hidden = state.recipe.include.length < 2
-  for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.mode === state.recipe.mode)
-  for (const b of $('raritySeg').children)
-    b.classList.toggle('on', Number(b.dataset.rarity) === state.recipe.rarity)
+  fillPills($('sumInc'), include, 'inc', null)
+  fillPills($('sumExc'), exclude, 'exc', null)
+  if (!include.length) none($('sumInc'), 'nobody yet')
+  if (!exclude.length) none($('sumExc'), 'nobody yet')
 }
 
 const renderChips = () => {
@@ -163,7 +245,9 @@ const renderChips = () => {
       b.type = 'button'
       b.className = 'chip'
       b.dataset.id = s.id
-      b.textContent = s.label
+      const sign = document.createElement('span')
+      sign.className = 'sign'
+      b.append(sign, document.createTextNode(s.label))
       row.append(b)
     }
     sec.append(h, row)
@@ -182,7 +266,22 @@ const syncChips = () => {
         : ''
     if (st) b.dataset.state = st
     else delete b.dataset.state
+    // Untouched chips preview the sign the active tab would give them, so the
+    // consequence of a tap is visible before you make it.
+    const sign = b.querySelector('.sign')
+    if (sign) sign.textContent = st === 'inc' ? '＋' : st === 'exc' ? '−' : state.pickMode === 'exc' ? '−' : '＋'
   }
+}
+
+const setPickMode = (mode) => {
+  state.pickMode = mode
+  for (const b of $('pickTabs').children) b.classList.toggle('on', b.dataset.mode === mode)
+  $('sheetTitle').textContent = mode === 'exc' ? 'Authors to exclude' : 'Authors to include'
+  $('pickHint').innerHTML =
+    mode === 'exc'
+      ? 'Tap an author to <b>subtract</b> their words (∖ difference). Tap again to undo.'
+      : 'Tap an author to <b>add</b> them to the include set. Tap again to undo.'
+  syncChips()
 }
 
 const toast = (msg) => {
@@ -309,22 +408,22 @@ const roll = () => {
   const { words, pool } = poolFor()
   const names = generateNames(state.corpus, pool, { count: BATCH, seed: state.seed })
 
-  status.innerHTML = `<b>${words.toLocaleString()}</b> words only these authors use → <b>${pool.length.toLocaleString()}</b> syllables`
+  status.innerHTML = `set holds <b>${words.toLocaleString()}</b> words → <b>${pool.length.toLocaleString()}</b> syllables`
   $('footRecipe').textContent = recipeText()
   writeUrl()
 
   if (!names.length) {
     status.classList.add('warn')
     if (state.recipe.mode === 'all' && state.recipe.include.length > 1) {
-      status.textContent = 'These authors share almost no rare words.'
-      showEmpty('mix them instead', () => {
+      status.textContent = 'That intersection is empty — these authors share almost no rare words.'
+      showEmpty('switch to ∪ UNION', () => {
         state.recipe.mode = 'any'
         renderPills()
         roll()
       })
     } else {
-      status.textContent = 'Nothing survived that filter.'
-      showEmpty('loosen it', () => {
+      status.textContent = 'Every word got subtracted.'
+      showEmpty('weaken the ∖ difference', () => {
         state.recipe.rarity = state.recipe.rarity === 0 ? 0 : state.recipe.rarity + 4
         renderPills()
         roll()
@@ -384,9 +483,10 @@ const reroll = () => {
 
 // ---------------------------------------------------------------- sheets
 
-const openSheet = () => {
+const openSheet = (mode = 'inc') => {
   $('sheet').hidden = false
-  syncChips()
+  setPickMode(mode)
+  renderSummary()
 }
 const closeSheet = () => {
   $('sheet').hidden = true
@@ -395,7 +495,6 @@ const closeSheet = () => {
 // ---------------------------------------------------------------- wiring
 
 const wire = () => {
-  $('pickBtn').onclick = openSheet
   for (const el of document.querySelectorAll('[data-close]')) el.onclick = closeSheet
   for (const el of document.querySelectorAll('[data-close-kept]'))
     el.onclick = () => ($('keptSheet').hidden = true)
@@ -407,19 +506,29 @@ const wire = () => {
 
   $('rollBtn').onclick = reroll
 
+  $('pickTabs').onclick = (e) => {
+    const b = e.target.closest('button')
+    if (b) setPickMode(b.dataset.mode)
+  }
+
+  // No hidden cycle: a tap puts the author in whichever set the tab names, or
+  // takes them out of it. Which set that is, is stated at the top of the sheet.
   $('chipGroups').onclick = (e) => {
     const chip = e.target.closest('.chip')
     if (!chip) return
     const id = chip.dataset.id
     const { include, exclude } = state.recipe
-    const iI = include.indexOf(id)
-    const iE = exclude.indexOf(id)
-    if (iI < 0 && iE < 0) include.push(id)
-    else if (iI >= 0) {
-      include.splice(iI, 1)
-      exclude.push(id)
-    } else exclude.splice(iE, 1)
+    const bucket = state.pickMode === 'exc' ? exclude : include
+    const other = state.pickMode === 'exc' ? include : exclude
+
+    const oi = other.indexOf(id)
+    if (oi >= 0) other.splice(oi, 1)
+    const bi = bucket.indexOf(id)
+    if (bi >= 0) bucket.splice(bi, 1)
+    else bucket.push(id)
+
     syncChips()
+    renderSummary()
     renderPills()
     roll()
   }
