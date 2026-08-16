@@ -12,7 +12,7 @@
     "tune": "node scripts/tune.mjs",
     "serve": "node scripts/serve.mjs",
     "deploy": "wrangler pages deploy dist --project-name nameforge",
-    "test": "node --test scripts/setmath.test.mjs",
+    "test": "node --test scripts/setmath.test.mjs scripts/names.test.mjs",
     "verify": "node scripts/verify.mjs"
   },
   "devDependencies": {
