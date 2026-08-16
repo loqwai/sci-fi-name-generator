@@ -236,9 +236,9 @@ const main = async () => {
 
   // Delivery, decided by measurement rather than taste:
   //
-  //   raw .bin        1,051 KB on the wire -- Cloudflare does not compress
+  //   raw .bin        1,569 KB on the wire -- Cloudflare does not compress
   //                   application/octet-stream at all.
-  //   gzip .bin       378 KB, but the browser receives gzip bytes (the edge
+  //   gzip .bin       473 KB, but the browser receives gzip bytes (the edge
   //                   re-compresses and eats our Content-Encoding), so the app
   //                   must inflate them via DecompressionStream -- which Safari
   //                   only gained in 16.4. Verified to hard-fail without it.

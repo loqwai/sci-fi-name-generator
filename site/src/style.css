@@ -731,26 +731,38 @@ h1 {
 
 /* Capped height with its own scroll: the whole list stays reachable without
    pushing the names -- the actual product -- off the first screen. */
+/* 58 authors is 2,348px of rows. Through a 196px peephole that was twelve
+   flicks with no idea where you were, so the box is a little taller and the
+   group headings pin to the top while you scroll -- you can always see which
+   shelf you are on. The rows themselves are untouched: still one tap each. */
 .author-list {
-  max-height: 196px;
+  max-height: 244px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 7px;
+  padding: 0 7px 7px;
   overscroll-behavior: contain;
 }
 .author-group {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   font-size: 10.5px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--dim);
   font-weight: 800;
-  padding: 7px 4px 3px;
+  padding: 8px 4px 4px;
+  margin: 0 -4px;
+  background: var(--bg-2);
+  box-shadow: 0 1px 0 var(--line);
 }
-.author-group:first-child {
-  padding-top: 2px;
+.author-group .count {
+  float: right;
+  opacity: 0.65;
+  letter-spacing: 0.04em;
 }
 .author-row {
   display: flex;

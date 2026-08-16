@@ -167,6 +167,12 @@ const renderAuthors = () => {
     const h = document.createElement('div')
     h.className = 'author-group'
     h.textContent = g.label
+    // How many are under this heading, so a long shelf announces its length
+    // rather than making you scroll to find out.
+    const c = document.createElement('span')
+    c.className = 'count'
+    c.textContent = inGroup.length
+    h.append(c)
     wrap.append(h)
     for (const s of inGroup) {
       const row = document.createElement('div')

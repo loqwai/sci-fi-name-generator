@@ -11,10 +11,11 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { gunzipSync } from 'node:zlib'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { SOURCES } from './corpora.mjs'
 import { DEFAULT_RECIPE, parseCorpus, selectWords, selectStages, countBits, syllablePool, generateNames } from '../src/engine.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -37,6 +38,24 @@ const equal = (a, b) => {
 const PAIRS = []
 for (let i = 0; i < IDS.length; i++)
   for (let j = i + 1; j < IDS.length; j++) PAIRS.push([IDS[i], IDS[j]])
+
+// A book with no chip is not just unpickable. The df pass adds 1 to a word's
+// total frequency per document, so a word occurring only in unattributed books
+// tops out at 1 and MIN_TOTAL_FREQ deletes it. Nineteen books were in that
+// state and silently took ~20k words with them. This is the guard.
+test('every book in top100 is attributed to a chip', async () => {
+  const attributed = new Set()
+  for (const s of SOURCES) for (const f of s.files ?? []) attributed.add(f.replace(/\\/g, '/'))
+
+  const dir = join(__dirname, '..', '..', 'data', 'top100')
+  const orphans = (await readdir(dir)).filter((f) => !attributed.has(`top100/${f}`))
+
+  assert.deepEqual(
+    orphans,
+    [],
+    `${orphans.length} book(s) feed the common-English filter but no chip, so their unique words are pruned: ${orphans.join(', ')}`,
+  )
+})
 
 test('every author has a non-empty vocabulary', () => {
   assert.ok(IDS.length >= 30, `only ${IDS.length} sources`)
