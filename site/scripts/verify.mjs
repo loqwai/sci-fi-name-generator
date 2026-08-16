@@ -195,7 +195,7 @@ await step('excluded rows read without colour (line-through)', async () => {
 
 await step('PROOF panel shows real source words', async () => {
   const txt = await page.textContent('#proofBox')
-  if (!/words survived/.test(txt)) throw new Error('no survived stage')
+  if (!/words the recipe kept/.test(txt)) throw new Error(`no surviving-words stage: "${txt.slice(0, 80)}"`)
   const box = await page.textContent('.wordbox')
   const sample = box.split(', ').filter(Boolean)
   if (sample.length < 20) throw new Error(`only ${sample.length} words shown`)
@@ -206,12 +206,26 @@ await step('PROOF panel shows real source words', async () => {
   console.log(`       set sample: ${sample.slice(0, 12).join(', ')}`)
 })
 
-await step('PROOF panel shows what common English removed', async () => {
+// He asked for the struck-through discards gone: the surviving words are the
+// evidence he reads. The COUNTS still have to survive in the status line,
+// because those are what expose a filter eating the whole set.
+await step('the discarded-word lists are gone, but the counts remain', async () => {
   const txt = await page.textContent('#proofBox')
-  if (!/dropped as common English/.test(txt)) throw new Error('no dropped stage')
-  const boxes = await page.$$eval('.wordbox', (e) => e.map((x) => x.textContent))
-  if (boxes.length < 2) throw new Error('no second word list')
-  console.log(`       dropped sample: ${boxes[boxes.length - 1].split(', ').slice(0, 10).join(', ')}`)
+  if (/dropped as common English|removed by/.test(txt)) throw new Error('a discard list is still rendered')
+  if (await page.$('.wordbox.cut')) throw new Error('a struck-through word list is still rendered')
+  const status = await page.textContent('#status')
+  if (!/common\(≥\d\)/.test(status)) throw new Error(`status lost the filter stage: "${status}"`)
+  if (!/[\d,]+/.test(status)) throw new Error('status lost its counts')
+})
+
+// The whole point of moving it: the evidence is read BEFORE the names.
+await step('the surviving words sit above the names in the document', async () => {
+  const order = await page.evaluate(() => {
+    const p = document.getElementById('proof')
+    const r = document.getElementById('results')
+    return p.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING ? 'proof-first' : 'names-first'
+  })
+  if (order !== 'proof-first') throw new Error(`document order was ${order}`)
 })
 
 await step('every name card shows how it was assembled', async () => {

@@ -274,10 +274,16 @@ const renderControls = () => {
 //
 // He wrote this algorithm and wants to see it working, which is fair: a count
 // and some invented words prove nothing on their own. So show the real
-// vocabulary each stage kept AND what it threw away, and let any generated name
-// be traced back to the source words its syllables came from.
+// vocabulary the recipe selected, above the names it produced, and let any
+// generated name be traced back to the source words its syllables came from.
+//
+// What was thrown away used to be listed here too, struck through. He asked for
+// it gone -- the surviving words are the evidence he actually reads. The
+// per-stage COUNTS stay in the status line, because those are what reveal a
+// filter quietly eating everything.
 
 const WORD_SAMPLE = 400
+const COLLAPSED_LINES = 3
 
 const stageBlock = (title, cls, count, words, note) => {
   const wrap = document.createElement('div')
@@ -313,41 +319,36 @@ const renderProof = (stages) => {
     return
   }
 
+  // One tight line of heading, two lines of real words, and a way to see the
+  // rest. Sitting above the names it has to earn every pixel: a taller block
+  // pushes the first screen's names off it, and a first screen with no names on
+  // it is the original failure this whole app was rebuilt around.
   const keptN = countBits(stages.final)
   const kept = wordsIn(state.corpus, stages.final, WORD_SAMPLE)
-  box.append(
-    stageBlock(
-      'words survived — these are what the names are built from',
-      'kept',
-      keptN,
-      kept,
-      keptN > WORD_SAMPLE ? `showing an even spread of ${WORD_SAMPLE}` : '',
-    ),
-  )
 
-  const exN = countBits(stages.droppedByExclude)
-  if (exN) {
-    box.append(
-      stageBlock(
-        `removed by ∖ ${state.recipe.exclude.map(labelOf).join(', ')}`,
-        'cut',
-        exN,
-        wordsIn(state.corpus, stages.droppedByExclude, 120),
-      ),
-    )
-  }
+  const head = document.createElement('div')
+  head.className = 'stage-head kept'
+  const n = document.createElement('span')
+  n.className = 'n'
+  n.textContent = keptN.toLocaleString()
+  head.append(document.createTextNode('PROOF — '), n, document.createTextNode(' words the recipe kept'))
 
-  const cmN = countBits(stages.droppedByCommon)
-  if (cmN) {
-    box.append(
-      stageBlock(
-        `dropped as common English (≥${state.recipe.rarity} classics)`,
-        'cut',
-        cmN,
-        wordsIn(state.corpus, stages.droppedByCommon, 120),
-      ),
-    )
+  const wb = document.createElement('div')
+  wb.className = 'wordbox clamp'
+  wb.textContent = kept.length ? kept.join(', ') : '(none)'
+
+  const more = document.createElement('button')
+  more.type = 'button'
+  more.className = 'morebtn'
+  more.textContent = 'more ▾'
+  more.onclick = () => {
+    const open = wb.classList.toggle('open')
+    more.textContent = open ? 'less ▴' : 'more ▾'
+    more.title = open && keptN > WORD_SAMPLE ? `an even spread of ${WORD_SAMPLE} of ${keptN}` : ''
   }
+  head.append(more)
+
+  box.append(head, wb)
 }
 
 // Tapping a name shows the source words each of its syllables came from.

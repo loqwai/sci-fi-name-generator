@@ -736,7 +736,7 @@ h1 {
    group headings pin to the top while you scroll -- you can always see which
    shelf you are on. The rows themselves are untouched: still one tap each. */
 .author-list {
-  max-height: 244px;
+  max-height: 200px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg-2);
@@ -865,10 +865,37 @@ h1 {
   color: var(--dim);
   overflow-wrap: anywhere;
 }
-.wordbox.cut {
-  color: #8a6a72;
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
+/* Above the names, so it shows two lines and offers the rest rather than
+   taking 132px off the first screen. */
+.wordbox.clamp {
+  /* exactly two lines: any fraction of a third reads as a rendering fault */
+  line-height: 1.6;
+  padding: 5px 10px;
+  max-height: calc(3.2em + 10px);
+  overflow: hidden;
+}
+.wordbox.clamp.open {
+  max-height: 190px;
+  overflow-y: auto;
+}
+.morebtn {
+  float: right;
+  background: none;
+  border: 0;
+  padding: 0 2px 0 8px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  cursor: pointer;
+}
+/* The proof block leads now, so it needs no rule above separating it from the
+   names it used to follow, and no top margin fighting the status line. */
+.proof-top {
+  margin-top: 8px;
+  border-top: 0;
+  padding-top: 0;
 }
 .trace {
   background: var(--bg-2);

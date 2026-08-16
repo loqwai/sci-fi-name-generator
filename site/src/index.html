@@ -68,13 +68,17 @@
 
       <p id="status" class="status"></p>
 
-      <section id="results" class="results"></section>
-
-      <section class="proof" id="proof">
-        <div class="ctl-label">PROOF — the real words behind the names</div>
-        <div id="traceBox" class="trace" hidden></div>
+      <!-- Evidence first, names second. He reads this to check the working, and
+           the working runs recipe -> words it selected -> names built from them.
+           Names above the words meant reading the answer before the sum. The
+           list is collapsed to a few lines so it cannot bury the names. -->
+      <section class="proof proof-top" id="proof">
         <div id="proofBox"></div>
       </section>
+
+      <section id="results" class="results"></section>
+
+      <div id="traceBox" class="trace" hidden></div>
 
       <p class="foot">
         tap a name to copy it · ★ to keep it<br />
