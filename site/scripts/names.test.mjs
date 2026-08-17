@@ -171,10 +171,21 @@ test('three syllables is the commonest shape, and four still happens', () => {
   assert.ok(hist[4] > 0, `no 4-syllable names at all -- tornoromic could not be produced (${JSON.stringify(hist)})`)
 })
 
-test('names are not accidentally obscene', () => {
-  const OBSCENE = /anal|anus|arse|cunt|fuck|nigg|penis|piss|porn|rape|shit|slut|twat|whore/
-  const bad = everyName.filter((n) => OBSCENE.test(n.name)).map((n) => n.name)
-  assert.deepEqual(bad, [], 'obscene name(s) generated')
+test('obscenity is NOT filtered -- the generator does not censor', () => {
+  // Inverted deliberately. This test used to assert that no generated name
+  // matched an OBSCENE substring list. The owner's instruction was explicit --
+  // "I like obscenity don't censor things" -- so the list and its check were
+  // deleted from the engine, and this assertion now guards the opposite: that
+  // nobody quietly reintroduces the filter. These are the exact two names that
+  // prompted it, and both must remain producible.
+  //
+  // Note this is a rule about OBSCENITY only. Rude-looking names are still
+  // subject to every other filter on their merits -- `cockrel` is rejected for
+  // the unreadable "ck|r" seam, `wankor` for containing "wan" -- and that is
+  // the legibility machinery doing its job, not censorship.
+  for (const name of ['machoanal', 'stipoganal']) {
+    assert.equal(rejectReason(corpus, name), null, `"${name}" is rejected -- an obscenity filter is back`)
+  }
 })
 
 test('a batch is not the same name over and over', () => {

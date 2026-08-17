@@ -293,14 +293,6 @@ const BARRED_INITIAL = new Set([
   'out', 'fore', 'anti', 'semi', 'sub', 'ex', 'in', 'im', 'up', 'be', 'as',
 ])
 
-// Sound the machine cannot be allowed to make. Two syllables collided into
-// `machoanal` and `stipoganal` in a single batch, and one of those on the first
-// screen costs more than every good name in the batch earns. Substrings, not
-// syllables -- a reader sees the letters, not the seams. Kept deliberately
-// short and unambiguous so it does not quietly eat innocent names.
-const OBSCENE =
-  /anal|anus|arse|bitch|bollock|clitor|cock|cunt|dildo|faggot|fellat|fuck|jizz|nigg|penis|piss|porn|pube|queef|rape|rectum|retard|scrotum|semen|shit|slut|smegma|sperm|spunk|testicl|turd|twat|vagin|wank|whore/
-
 const allowedAt = (syl, pos) => {
   if (BARRED_ANY.has(syl)) return false
   if (pos === 'initial') return !BARRED_INITIAL.has(syl)
@@ -674,7 +666,6 @@ export const makeNameFilter = (corpus, opts = {}) => {
     const bad = parts.find((p) => BARRED_ANY.has(p))
     if (bad) return `English affix "${bad}" in the middle`
     if (rejectPlural && PLURAL_RE.test(w)) return 'reads as a plural'
-    if (OBSCENE.test(w)) return 'obscene'
     if (!isPronounceable(w)) return 'unpronounceable'
     if (opts.legible !== false) {
       const hard = legibilityReason(corpus, w, opts)
