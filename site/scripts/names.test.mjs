@@ -184,6 +184,13 @@ test('a batch is not the same name over and over', () => {
       const uniq = new Set(s.map((n) => n.name))
       assert.equal(uniq.size, s.length, `${r.t}: duplicate names in one batch`)
     }
+    // Across four screens the engine promises nothing -- it dedupes per batch,
+    // so an occasional birthday collision is honest rather than a fault. What
+    // would NOT be honest is the output space quietly collapsing as the filters
+    // tighten, so this asks for 95% and catches that without being flaky.
+    const across = new Set(names.map((n) => n.name))
+    assert.ok(across.size >= names.length * 0.95,
+      `${r.t}: only ${across.size} distinct names across ${names.length} -- the output space is collapsing`)
     const openings = new Set(names.map((n) => n.parts[0]))
     assert.ok(openings.size > names.length / 4, `${r.t}: only ${openings.size} distinct openings in ${names.length} names`)
   }
@@ -331,11 +338,15 @@ test('a graft never lands on a vowel, and -eth still bars the verbs', () => {
   }
   // -eth is available as a name ending…
   assert.equal(rejectReason(corpus, ['kel', 'eth']), null)
-  // …but not as a conjugation: `dare` is underneath `dareth`, `love` under
-  // `loveth`. That is why `eth` moved out of BARRED_FINAL_RE and into
-  // INFLECTIONS -- the pattern barred both, the stem check bars only the verb.
-  assert.ok(rejectReason(corpus, ['dar', 'eth']))
-  assert.ok(rejectReason(corpus, ['lov', 'eth']))
+  // …but not as a conjugation. That is why `eth` moved out of BARRED_FINAL_RE
+  // and into INFLECTIONS: the pattern barred both, the stem check bars only the
+  // verb. Neither `glareth` nor `tradeth` is in the vocabulary, so the "is a
+  // real word" rule cannot be what catches them -- it has to be the stem
+  // underneath, which is the mechanism this is here to hold down.
+  for (const verb of [['glar', 'eth'], ['trad', 'eth']]) {
+    assert.ok(!corpus.wordSet.has(verb.join('')), `${verb.join('')} is in the vocabulary -- pick another verb`)
+    assert.ok(rejectReason(corpus, verb), `"${verb.join('')}" is accepted -- -eth is no longer checked as a conjugation`)
+  }
 })
 
 test('rejectReason accepts a finished name as well as parts', () => {
