@@ -1,0 +1,21 @@
+{
+  "name": "nameforge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phone-first name generator built on the sci-fi-name-generator corpora",
+  "scripts": {
+    "build:corpus": "node --max-old-space-size=8192 scripts/build-corpus.mjs",
+    "build": "npm run build:corpus && node scripts/build.mjs",
+    "stage": "node scripts/build.mjs",
+    "sample": "node scripts/sample.mjs",
+    "tune": "node scripts/tune.mjs",
+    "serve": "node scripts/serve.mjs",
+    "deploy": "wrangler pages deploy dist --project-name nameforge",
+    "test": "node --test scripts/setmath.test.mjs scripts/names.test.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "pronounceable": "^1.0.1"
+  }
+}

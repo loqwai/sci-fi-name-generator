@@ -1,0 +1,8 @@
+# Same bytes, two deliveries: corpus.bin (gzip, 473 KB, needs
+# DecompressionStream) and corpus.b64.txt (base64 text/plain, 482 KB on the
+# wire, which the edge compresses and every browser inflates transparently).
+# app.js picks the cheap one when it can. See scripts/build-corpus.mjs.
+/corpus.bin
+  Cache-Control: public, max-age=86400
+/corpus.b64.txt
+  Cache-Control: public, max-age=86400
