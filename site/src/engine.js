@@ -273,8 +273,14 @@ const BARRED_ANY = new Set([
 // -ty, -ry, -ey, -ny turn any invented stem into an English diminutive
 // (`gerty`, `ruscy`, `falocy`, `graky`, `hamery`, `biaty`). Neither of his
 // keepers ends in one, and dropping the whole class cost nothing.
+//
+// `eth` used to be in this list and is deliberately no longer: it is one of the
+// grafted name endings below (`-eth`), and barring it by pattern would delete
+// `mareth` along with `wandereth`. The archaic-verb case is caught precisely
+// instead -- `eth` is in INFLECTIONS, so a name is only rejected when the stem
+// under it is a real word (`dareth` -> `dare`).
 const BARRED_FINAL_RE =
-  /(?:tion|sion|[cstx]ion|ness|ment|ance|ence|ship|hood|ward|ful|less|able|ible|ing|ism|ist|ity|ous|est|edly|ed|ies|eth|ish|ers?|ial|ual|ize|ise|y)$/
+  /(?:tion|sion|[cstx]ion|ness|ment|ance|ence|ship|hood|ward|ful|less|able|ible|ing|ism|ist|ity|ous|est|edly|ed|ies|ish|ers?|ial|ual|ize|ise|y)$/
 
 // Productive English PREFIXES: barred in first position. `un`, `re`, `dis` and
 // `in` are among the commonest word-initial syllables in the corpus, so an
@@ -317,6 +323,196 @@ export const commonWordSet = (corpus, minDf = 6) => {
   for (let i = 0; i < words.length; i++) if (df[i] >= minDf && words[i].length >= 3) set.add(words[i])
   corpus._common.set(minDf, set)
   return set
+}
+
+// ---------------------------------------------------------------- legibility
+//
+// The previous pass was about names not being GARBAGE. This one is about the
+// survivors being READABLE -- said correctly, at a glance, first try.
+//
+// Read a batch and the split is obvious. `galce`, `algel`, `coelim` alternate
+// consonant and vowel and you say them without thinking. `posculdex`,
+// `harcocaph`, `ezirimlis`, `boussoniac`, `kabdomarah` do not, and you stop and
+// re-parse. Every one of those stumbles is a consonant pile-up that English
+// would never spell in that place.
+//
+// So the rule is not invented, it is BORROWED: harvest the consonant clusters
+// real English words actually use, separately for word-start, word-middle and
+// word-end, and let a name use a cluster only where English uses it. `tr-` and
+// `st-` open words; `-nd` and `-ght` close them; `scd`, `phc` and `zrm` do
+// neither, anywhere.
+
+// Sonority, low to high: stops < fricatives < nasals < liquids < glides. Used
+// for the Syllable Contact Law -- across a syllable seam, sonority must FALL or
+// hold. `ter|skiel` is fine (r is more sonorous than s); `ezi|rim|lis` is not
+// (m is LESS sonorous than the l after it, so the seam has nowhere to sit and
+// the reader stalls). This one principle separates every hard name in the batch
+// from every easy one, and it is why `tl`, `ml`, `nr`, `sr`, `tn`, `pm` and
+// `dl` are gone while `rn`, `rb`, `lc`, `st` and `nd` stay.
+const SONORITY = {
+  w: 5, y: 5,
+  l: 4, r: 4,
+  m: 3, n: 3,
+  f: 2, v: 2, s: 2, z: 2, h: 2,
+  p: 1, b: 1, t: 1, d: 1, k: 1, g: 1, c: 1, q: 1, j: 1, x: 1,
+}
+// Two letters, one sound. Splitting `th` or `ck` into two consonants would
+// price `thalis` and `parvack` as clusters they are not.
+const DIGRAPHS = new Set(['ch', 'sh', 'th', 'ph', 'wh', 'gh', 'ck', 'ng', 'qu', 'kn', 'wr', 'rh'])
+const sonorityOf = (u) => (u === 'ng' ? 3 : u === 'th' || u === 'sh' || u === 'ph' || u === 'wh' || u === 'gh' ? 2 : SONORITY[u[u.length - 1]] ?? 1)
+
+// A consonant run as SOUNDS rather than letters: `th` is one, `ck` is one, and
+// a doubled letter (`ss`, `rr`, `tt`) is one.
+export const consonantUnits = (run) => {
+  const units = []
+  for (let i = 0; i < run.length; i++) {
+    const two = run.slice(i, i + 2)
+    if (DIGRAPHS.has(two)) { units.push(two); i++; continue }
+    if (run[i] === run[i + 1]) { units.push(run[i]); i++; continue }
+    units.push(run[i])
+  }
+  return units
+}
+
+// English vowel digraphs. Position-independent on purpose: `ai` is common in
+// the middle (rain) and rare at the end, but `narai` is one of his keepers, so
+// the end is not a place to get clever. Anything NOT on this list (`iae`,
+// `eea`, `uou`) is a genuine stumble and is rejected.
+const VOWEL_PAIRS = new Set([
+  'ai', 'au', 'aw', 'ay', 'ea', 'ee', 'ei', 'eo', 'eu', 'ew', 'ey',
+  'ia', 'ie', 'io', 'iu', 'oa', 'oe', 'oi', 'oo', 'ou', 'ow', 'oy',
+  'ua', 'ue', 'ui', 'uo', 'ya', 'ye', 'yo', 'ae',
+])
+
+// The harvested inventory. One pass over the vocabulary, keeping only words
+// solid enough to be evidence about English (in >= minDf of the 63 classics),
+// counting every consonant run by the position it appeared in. Memoised on the
+// corpus -- it depends on nothing else and the browser builds it once.
+//
+// The frequency floors are what make this a filter rather than a rubber stamp,
+// and they are set by where his OWN good names fall. Sonority contact (above)
+// already removes every rising seam, so the floor only has to catch the flat
+// ones -- stop against stop, nasal against nasal -- where English has a handful
+// of Latin borrowings and nothing else. Medially the corpus attests `bd` in 12
+// words, `db` in 3, `gd` in 2 and `kt` in none, against `lc` in 35 and `lg` in
+// 25. A floor of 20 keeps `galce` and `algel`, which he picked out of the batch
+// himself, and drops `kabdomarah`. Set it at 25 and his two names die with it.
+export const clusterInventory = (corpus, opts = {}) => {
+  // minInitial is 15 rather than 10 for one specific reason: `gn-` and `ps-`
+  // are silent-letter relics (gnaw, psalm) attested 11 and 9 times. Left in the
+  // opening inventory they also license `-gn-` and `-ps-` in the MIDDLE, where
+  // the g is not silent and the seam rises -- which is `haugnis` and
+  // `artognimun` waved straight through. 15 drops the relics and keeps `dw-`
+  // (17), `spl-` (19), `chr-` (20) and `rh-` (22).
+  const { minDf = 3, minInitial = 15, minMedial = 20, minFinal = 12 } = opts
+  const key = `${minDf}:${minInitial}:${minMedial}:${minFinal}`
+  corpus._clusters = corpus._clusters || new Map()
+  const hit = corpus._clusters.get(key)
+  if (hit) return hit
+
+  const { words, df } = corpus
+  const init = new Map()
+  const med = new Map()
+  const fin = new Map()
+  const bump = (m, k) => m.set(k, (m.get(k) ?? 0) + 1)
+  const run = /[^aeiouy]+/g
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]
+    if (df[i] < minDf || w.length < 3) continue
+    if (!/^[a-z]+$/.test(w)) continue
+    run.lastIndex = 0
+    let m
+    while ((m = run.exec(w))) {
+      if (m[0].length < 2) continue
+      if (m.index === 0) bump(init, m[0])
+      else if (m.index + m[0].length === w.length) bump(fin, m[0])
+      else bump(med, m[0])
+    }
+  }
+  const keep = (m, min) => new Set([...m].filter(([, c]) => c >= min).map(([r]) => r))
+  const inv = { initial: keep(init, minInitial), medial: keep(med, minMedial), final: keep(fin, minFinal) }
+  corpus._clusters.set(key, inv)
+  return inv
+}
+
+// Is `run` something a word can START with? Single consonants always are.
+const legalOnset = (inv, run) => run.length < 2 || inv.initial.has(run)
+// …and END with?
+const legalCoda = (inv, run) => run.length < 2 || inv.final.has(run)
+
+// Why a word is hard to read, or null if it is not. Exported so the regression
+// suite can assert on a specific string instead of generating batches and
+// hoping the bad shape comes up.
+export const legibilityReason = (corpus, w, opts = {}) => {
+  const { maxUnits = 2, alternation = 5 } = opts
+  const inv = clusterInventory(corpus, opts)
+
+  let clusters = 0
+  const runs = /([^aeiouy]+)|([aeiouy]+)/g
+  let m
+  while ((m = runs.exec(w))) {
+    const seg = m[0]
+    const atStart = m.index === 0
+    const atEnd = m.index + seg.length === w.length
+
+    if (m[2]) {
+      // Vowel pile-up. Three vowels in a row has no English spelling and no
+      // agreed pronunciation -- `trisiae`, `latiraichi`, `eitoheetz`.
+      if (seg.length > 2) return `vowel pile-up "${seg}"`
+      if (seg.length === 2 && !VOWEL_PAIRS.has(seg)) return `vowel pair "${seg}" is not English`
+      continue
+    }
+
+    const units = consonantUnits(seg)
+    if (units.length >= 2) clusters++
+    if (seg.length > 4) return `consonant pile-up "${seg}"`
+
+    if (atStart && atEnd) return 'no vowel'
+    if (atStart) {
+      // Openings are capped at two sounds, with one documented exception: the
+      // s+stop+liquid onsets (str-, spr-, scr-, spl-) that English really does
+      // use. The inventory decides -- if it is not attested word-initially it
+      // is not an opening, however pronounceable the letters look apart.
+      if (seg.length >= 2 && !inv.initial.has(seg)) return `"${seg}-" does not open English words`
+      if (units.length > (inv.initial.has(seg) ? 3 : maxUnits)) return `"${seg}-" is ${units.length} sounds`
+      continue
+    }
+    if (atEnd) {
+      if (seg.length >= 2 && !inv.final.has(seg)) return `"-${seg}" does not end English words`
+      if (units.length > maxUnits) return `"-${seg}" is ${units.length} sounds`
+      continue
+    }
+
+    // Interior run: English syllabifies it, so what has to be legal is the two
+    // halves, not the trigram. Take the longest legal onset off the back and
+    // whatever is left is the coda.
+    let cut = seg.length
+    for (let k = Math.max(0, seg.length - 3); k < seg.length; k++) {
+      if (legalOnset(inv, seg.slice(k))) { cut = k; break }
+    }
+    const coda = seg.slice(0, cut)
+    const onset = seg.slice(cut)
+    if (!onset) return `"${seg}" cannot start a syllable`
+    if (!legalCoda(inv, coda)) return `"${coda}" does not end a syllable`
+    if (consonantUnits(coda).length > maxUnits || consonantUnits(onset).length > maxUnits)
+      return `"${seg}" is more than ${maxUnits} sounds in one position`
+    // Two-letter interior runs are the common case and get the frequency floor
+    // directly: this is where `ml`, `bd`, `tn`, `sr` and `pm` die.
+    if (seg.length === 2 && !inv.medial.has(seg)) return `"${seg}" is not an English interior cluster`
+    if (coda) {
+      const a = consonantUnits(coda)
+      const b = consonantUnits(onset)
+      if (sonorityOf(a[a.length - 1]) < sonorityOf(b[0])) return `"${coda}|${onset}" rises across the seam`
+    }
+  }
+
+  // …and the shape as a whole. Every cluster is a place the consonant/vowel
+  // alternation breaks, so a name gets a budget of one per five letters:
+  // `galce` and `quarbet` spend their one, `tornoromic` spends one of two.
+  // `posculdex` (sc + ld in nine letters) and `printizeb` (pr + nt) want three
+  // letters they have not got, which is exactly why they read as a mouthful.
+  if (clusters * alternation > w.length) return `${clusters} clusters in ${w.length} letters`
+  return null
 }
 
 // ---------------------------------------------------------------- syllable pools
@@ -387,7 +583,11 @@ export const rng = (seed) => () => {
 // Inflections to strip before asking "is the stem a real word?". `losed` is not
 // in the vocabulary, but `lose` is, and nobody reads `losed` as a name -- they
 // read it as a typo. Same for `ductes` (duct) and `fieltusing` (…using).
-const INFLECTIONS = ['ing', 'ings', 'ed', 'es', 's', 'ly', 'er', 'ers', 'est', 'd', 'ies']
+//
+// `eth` is here rather than in BARRED_FINAL_RE so that the graft `-eth` stays
+// available: `mareth` keeps its ending, `dareth` loses it because `dare` is
+// underneath.
+const INFLECTIONS = ['ing', 'ings', 'ed', 'es', 's', 'ly', 'er', 'ers', 'est', 'd', 'ies', 'eth']
 
 // A trailing s reads as a plural -- `rokets`, `oshes`, `epasels`, `wilbins` are
 // all "some number of fake nouns". The exception is the Latin/Greek ending,
@@ -476,6 +676,10 @@ export const makeNameFilter = (corpus, opts = {}) => {
     if (rejectPlural && PLURAL_RE.test(w)) return 'reads as a plural'
     if (OBSCENE.test(w)) return 'obscene'
     if (!isPronounceable(w)) return 'unpronounceable'
+    if (opts.legible !== false) {
+      const hard = legibilityReason(corpus, w, opts)
+      if (hard) return `hard to read: ${hard}`
+    }
     if (rejectRealWords) {
       if (corpus.wordSet.has(w)) return 'is a real word'
       const seg = englishSegment(parts)
@@ -490,6 +694,22 @@ export const makeNameFilter = (corpus, opts = {}) => {
 // One-shot convenience for tests and for anyone asking "why was this dropped?".
 export const rejectReason = (corpus, parts, opts = {}) =>
   makeNameFilter(corpus, opts)(Array.isArray(parts) ? parts : getSyllables(parts).map((s) => s.toLowerCase()))
+
+// ---------------------------------------------------------------- grafts
+//
+// The one thing in this file that does not come out of the prose, and the one
+// he explicitly unlocked: "it doesn't have to strictly come from the corpus".
+//
+// A corpus of English will not hand you a NAME ending, because English words do
+// not end the way names do. When the generator lands on one by accident --
+// `tarelsior`, `mithronian`, `gloleriel` -- the name suddenly reads as a person
+// rather than a misspelling. So a proportion of names get the ending grafted on
+// deliberately, onto a stem harvested the normal way.
+//
+// Every graft starts with a vowel and is only ever attached to a stem that ends
+// in a consonant, so the seam alternates by construction -- the graft cannot
+// manufacture the cluster the rules above just spent their time removing.
+export const GRAFTS = ['a', 'us', 'is', 'on', 'ar', 'or', 'el', 'ia', 'ara', 'iel', 'eth', 'ith']
 
 export const generateNames = (corpus, pool, opts = {}) => {
   const { count = 24, seed = 1 } = opts
@@ -527,11 +747,28 @@ export const generateNames = (corpus, pool, opts = {}) => {
   const seen = new Set()
   const maxAttempts = count * 900
 
+  // One name in three takes a grafted ending.
+  //
+  // The proportion is the whole risk. Graft everything and the page turns into
+  // generic fantasy -- twenty-four names that all end -a/-us/-iel read as one
+  // name repeated. Graft none and the good endings only happen by luck. A third,
+  // spread over twelve endings, puts about eight grafted names in a 24-name
+  // batch across six or seven different endings, so no ending shows up twice on
+  // a screen and the other sixteen names still come entirely out of the prose.
+  // Read side by side, this is the point where the batch gained a register
+  // without gaining a house style.
+  const graftRate = opts.graftRate ?? 1 / 3
+
   for (let a = 0; a < maxAttempts && out.length < count; a++) {
     const n = shape[randomInRange(0, shape.length - 1)]
     const parts = [pick(initial)]
     for (let i = 1; i < n - 1; i++) parts.push(pick(medial))
-    parts.push(pick(final))
+    if (rand() < graftRate) {
+      // The graft needs a consonant to land on; a stem ending in a vowel would
+      // make `tara`+`a`. Cheaper to redraw than to patch the seam.
+      if (/[aeiouy]$/.test(parts.join(''))) continue
+      parts.push(pick(GRAFTS))
+    } else parts.push(pick(final))
     // The pools are pre-filtered by position, but reject() re-checks: a caller
     // may hand us a plain array (tune.mjs, or anything built before positional
     // pools existed) and the fallback above can borrow from the flat pool.
