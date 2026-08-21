@@ -1,12 +1,30 @@
-// The name engine. No DOM, no imports -- runs identically in Node (for the
-// quality harness) and in the browser.
+// The name engine. No DOM -- runs identically in Node (for the quality
+// harness) and in the browser. Its one import is morphemes.js, which imports
+// nothing, so the dependency runs one way: app.js -> engine.js -> morphemes.js.
 //
-// This is scratch.test.js, preserved:
+// It used to be scratch.test.js, preserved:
 //   1. word-level set math between authors to isolate distinctive vocabulary
 //   2. split the surviving words into syllables (vowel-cluster regex)
 //   3. glue 2-4 random syllables together
 //   4. keep it if it is >= 5 chars and passes pronounceable.test
-// His accepted outputs were `tornoromic` and `quarbet`.
+// Accepted outputs were `tornoromic` and `quarbet`.
+//
+// Steps 2-4 are GONE, and this is why. The names that pipeline makes are
+// pronounceable and mean nothing, because a syllable harvested out of prose is
+// not a unit anybody recognises -- `quar` can only ever be said, never read.
+// The one name out of this whole project he kept is `hypnodroid`, and it is
+// made of two morphemes a reader already owns.
+//
+// The syllabifier cannot even represent that name: it cuts on vowel clusters,
+// so it reads `hypnodroid` as `hyp|nod|roid`, straight through the seam that
+// makes the name work, and the old pool's length cap dropped `droid` (5
+// letters) outright. His favourite name was structurally unreachable.
+//
+// So step 1 stays -- the set math is what makes the book pickers mean
+// something -- and composition moved to whole morphemes. See morphemes.js and
+// generateMorphemeBatch below.
+
+import { mineStems, composeBatch, makeNameFilter, compoundEvidence } from './morphemes.js'
 
 // ---------------------------------------------------------------- the default
 //
@@ -36,11 +54,21 @@
 //
 //   Lovecraft ∪ the Kabbalah, because a grimoire is the Necronomicon's own
 //   register, and it keeps the project's anchor author on the first screen.
+//   rarity 0, NOT 1 -- and this is a user-visible behaviour change.
+//
+//   `rarity: N` drops every word appearing in >= N of the 58 sources, so
+//   rarity 1 kept only vocabulary that appears NOWHERE ELSE in the library.
+//   That was right for a syllable generator hunting distinctive letter runs,
+//   and it is fatal for a morpheme generator: the words a reader recognises
+//   are by definition the ones that appear in lots of books, so rarity 1
+//   mines exactly the wrong end of the vocabulary. For lovecraft u kabbalah
+//   it leaves `blackly, alchemical, decasyllabic, hearst, sherman, abahu,
+//   auswahl, gaffarelli, sidonius` -- and ZERO usable stems.
 export const DEFAULT_RECIPE = {
   include: ['lovecraft', 'kabbalah'],
   exclude: [],
   mode: 'any',
-  rarity: 1,
+  rarity: 0,
 }
 
 // ---------------------------------------------------------------- parsing
@@ -157,15 +185,20 @@ export const wordsIn = (corpus, bitset, limit = 0) => {
   return sample
 }
 
-// Which source words in the current set actually contain this syllable? This is
-// what makes a generated name checkable: you can see the real words it came from.
-export const wordsWithSyllable = (corpus, bitset, syllable, limit = 6) => {
+// Which source words in the current set contain this stem? This is what makes
+// a generated name checkable: you can see the real words it came from.
+//
+// Replaces wordsWithSyllable. The trace now has an easier job and a more
+// honest answer -- a harvested stem IS a word in the set, and its relatives
+// (`cavern` -> caverns, caverned) are the interesting part of the receipt.
+// A curated stem is in no book at all, and the trace says so rather than
+// inventing a provenance for it.
+export const wordsWithStem = (corpus, bitset, stem, limit = 6) => {
   const out = []
   const { words } = corpus
   for (let i = 0; i < words.length && out.length < limit; i++) {
     if ((bitset[i >>> 5] & (1 << (i & 31))) === 0) continue
-    const syls = getSyllables(words[i])
-    if (syls && syls.some((s) => s.toLowerCase() === syllable)) out.push(words[i])
+    if (words[i].includes(stem)) out.push(words[i])
   }
   return out
 }
@@ -274,11 +307,13 @@ const BARRED_ANY = new Set([
 // (`gerty`, `ruscy`, `falocy`, `graky`, `hamery`, `biaty`). Neither of his
 // keepers ends in one, and dropping the whole class cost nothing.
 //
-// `eth` used to be in this list and is deliberately no longer: it is one of the
-// grafted name endings below (`-eth`), and barring it by pattern would delete
-// `mareth` along with `wandereth`. The archaic-verb case is caught precisely
-// instead -- `eth` is in INFLECTIONS, so a name is only rejected when the stem
-// under it is a real word (`dareth` -> `dare`).
+// `eth` used to be in this list and is deliberately no longer: it was one of
+// the grafted name endings (`-eth`), and barring it by pattern would have
+// deleted `mareth` along with `wandereth`.
+//
+// (The grafts and the INFLECTIONS list that made that distinction went out
+// with the syllable generator. This regex is retained because it is part of
+// the legibility analysis, which morphemes.js can use to vet harvested stems.)
 const BARRED_FINAL_RE =
   /(?:tion|sion|[cstx]ion|ness|ment|ance|ence|ship|hood|ward|ful|less|able|ible|ing|ism|ist|ity|ous|est|edly|ed|ies|ish|ers?|ial|ual|ize|ise|y)$/
 
@@ -506,61 +541,6 @@ export const legibilityReason = (corpus, w, opts = {}) => {
   if (clusters * alternation > w.length) return `${clusters} clusters in ${w.length} letters`
   return null
 }
-
-// ---------------------------------------------------------------- syllable pools
-
-// The flat pool keeps duplicates, exactly like the original's
-// words.map(getSyllables).flat() -- a syllable used by many distinct words is
-// proportionally more likely to be drawn. Its length is also what the UI
-// reports, so it stays UNFILTERED and byte-identical to before.
-//
-// Attached to it are three position-correct pools. `-tion` never begins a real
-// word and `un-` almost never ends one, so a syllable is only offered for the
-// slot it was actually observed in. This is what stops names reading as a word
-// that lost its front half. They are filtered (see morphology above) and
-// carried as properties on the array so that every existing caller --
-// app.js does `generateNames(corpus, syllablePool(...), ...)` -- keeps working
-// untouched.
-export const syllablePool = (corpus, selection, opts = {}) => {
-  // maxSyl: he capped syllables at length < 4 in his own second experiment.
-  // Long syllables are what turn glued names into consonant sludge.
-  const { maxSyl = 4 } = opts
-  const pool = []
-  const initial = []
-  const medial = []
-  const final = []
-  const { words } = corpus
-  for (let i = 0; i < words.length; i++) {
-    if ((selection[i >>> 5] & (1 << (i & 31))) === 0) continue
-    const syls = getSyllables(words[i])
-    if (!syls) continue
-    const t = []
-    for (const s of syls) {
-      if (s.length > maxSyl) continue
-      const l = s.toLowerCase()
-      pool.push(l)
-      t.push(l)
-    }
-    // Only harvest positions from words whose syllables ALL survived the length
-    // cap -- otherwise dropping a long middle syllable silently promotes the
-    // one after it to "final" and the position label becomes a lie.
-    if (!t.length || t.length !== syls.length) continue
-    if (t.length === 1) {
-      // A monosyllable is both an opening and an ending, and never a middle.
-      if (allowedAt(t[0], 'initial')) initial.push(t[0])
-      if (allowedAt(t[0], 'final')) final.push(t[0])
-      continue
-    }
-    if (allowedAt(t[0], 'initial')) initial.push(t[0])
-    if (allowedAt(t[t.length - 1], 'final')) final.push(t[t.length - 1])
-    for (let k = 1; k < t.length - 1; k++) if (allowedAt(t[k], 'medial')) medial.push(t[k])
-  }
-  pool.initial = initial
-  pool.medial = medial
-  pool.final = final
-  return pool
-}
-
 // ---------------------------------------------------------------- generation
 
 // mulberry32 -- so a (recipe, seed) pair always reproduces the same batch.
@@ -572,202 +552,43 @@ export const rng = (seed) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
-// Inflections to strip before asking "is the stem a real word?". `losed` is not
-// in the vocabulary, but `lose` is, and nobody reads `losed` as a name -- they
-// read it as a typo. Same for `ductes` (duct) and `fieltusing` (…using).
+
+// ---------------------------------------------------------------- morpheme path
 //
-// `eth` is here rather than in BARRED_FINAL_RE so that the graft `-eth` stays
-// available: `mareth` keeps its ending, `dareth` loses it because `dare` is
-// underneath.
-const INFLECTIONS = ['ing', 'ings', 'ed', 'es', 's', 'ly', 'er', 'ers', 'est', 'd', 'ies', 'eth']
-
-// A trailing s reads as a plural -- `rokets`, `oshes`, `epasels`, `wilbins` are
-// all "some number of fake nouns". The exception is the Latin/Greek ending,
-// which reads as singular and is where this corpus is at its best: `orros`,
-// `censitus`, `aksis`, `malonos`. So: a final s is allowed only after a vowel,
-// and not after `e` (that IS the English plural).
-const PLURAL_RE = /(?:[^aiouy]s|es)$/
-
-// Everything that can disqualify an assembly, in one place and exported, so the
-// regression list can be asserted directly rather than by generating batches
-// and hoping the bad name comes up. Returns a reason string, or null to keep.
+// The ONLY generator. The syllable path (`generateNames`, `syllablePool`,
+// `makeNameFilter`, `GRAFTS`) has been removed outright rather than left
+// behind a flag, because a disabled second generator is how the old output
+// quietly comes back.
 //
-// It takes PARTS, not a string: "is `city` glued on the end" is a question
-// about the seams, and a finished name has thrown them away.
-export const makeNameFilter = (corpus, opts = {}) => {
-  const {
-    minLength = 5,
-    // 10, down from 12. `tornoromic` is exactly 10 and `quarbet` is 7 -- the
-    // whole accepted range is short. Above 10 the extra room is spent almost
-    // entirely on sludge (`dosmomalboys`, `nootailaguil`, `shaldoubsall`).
-    maxLength = 10,
-    rejectRealWords = true,
-    minDf = 6,
-    // A three-letter syllable that happens to be a word is only fatal if the
-    // word is unmissable. `quarbet` -- one of his two accepted names -- is
-    // quar+BET, and `bet` is in 19 of the 63 classics. `man` is in all 63.
-    // Drawing the line between them is the difference between fixing the
-    // generator and neutering it.
-    obviousDf = 20,
-    rejectPlural = true,
-  } = opts
-  const isPronounceable = makePronounceable(corpus.triBits)
-  const common = rejectRealWords ? commonWordSet(corpus, minDf) : new Set()
-  const obvious = rejectRealWords ? commonWordSet(corpus, obviousDf) : new Set()
-
-  // Does any run of whole syllables spell an ordinary English word? Checking
-  // syllable-ALIGNED runs, not arbitrary substrings, is the point: `terskiel`
-  // contains "ski" but never as a piece, so it survives; `mationcity` hands you
-  // "city" as a piece, so it does not.
-  //
-  // The tiers matter. A word spelled by TWO syllables was assembled by us and
-  // is always a tell (`ci`+`ty`). A single syllable that is a word is only a
-  // tell if it is long (`head`, `boys`, `field`) or very common (`man`, `cat`,
-  // `ice`) -- otherwise the filter eats `quarbet`.
-  const englishSegment = (parts) => {
-    for (let i = 0; i < parts.length; i++) {
-      let run = ''
-      for (let j = i; j < parts.length; j++) {
-        run += parts[j]
-        if (run.length < 3) continue
-        const solo = i === j
-        if (!solo && common.has(run)) return run
-        if (solo && run.length >= 4 && common.has(run)) return run
-        if (solo && run.length === 3 && obvious.has(run)) return run
-      }
-    }
-    return null
-  }
-
-  // …and is the name itself just a real word with a tense on it?
-  const inflectedWord = (w) => {
-    for (const suf of INFLECTIONS) {
-      if (!w.endsWith(suf) || w.length - suf.length < 3) continue
-      const stem = w.slice(0, -suf.length)
-      if (common.has(stem) || corpus.wordSet.has(stem)) return stem
-      if (suf !== 's' && suf !== 'd' && common.has(stem + 'e')) return stem + 'e'
-    }
-    return null
-  }
-
-  return (parts) => {
-    if (!parts || !parts.length || parts.some((p) => !p)) return 'empty'
-    const w = parts.join('')
-    if (w.length < minLength) return 'too short'
-    if (w.length > maxLength) return 'too long'
-    // "gingin", "flatrivivi" -- a stutter reads as a mistake, not a name.
-    if (parts.some((p, i) => i && p === parts[i - 1])) return `stutter (${parts[0]})`
-    if (!allowedAt(parts[0], 'initial')) return `English prefix "${parts[0]}-"`
-    // Tested against the WHOLE name, not the last syllable. The syllable
-    // splitter cuts `manchoship` as man|chos|hip, which hides the -ship
-    // completely; the reader sees the letters, not the seams.
-    const m = w.match(BARRED_FINAL_RE)
-    if (m) return `English suffix "-${m[0]}"`
-    const bad = parts.find((p) => BARRED_ANY.has(p))
-    if (bad) return `English affix "${bad}" in the middle`
-    if (rejectPlural && PLURAL_RE.test(w)) return 'reads as a plural'
-    if (!isPronounceable(w)) return 'unpronounceable'
-    if (opts.legible !== false) {
-      const hard = legibilityReason(corpus, w, opts)
-      if (hard) return `hard to read: ${hard}`
-    }
-    if (rejectRealWords) {
-      if (corpus.wordSet.has(w)) return 'is a real word'
-      const seg = englishSegment(parts)
-      if (seg) return `contains the English word "${seg}"`
-      const stem = inflectedWord(w)
-      if (stem) return `is "${stem}" with an inflection`
-    }
-    return null
-  }
+// What deliberately SURVIVED that removal is the legibility analysis --
+// `legibilityReason`, `clusterInventory`, `consonantUnits`, the sonority
+// table. Those were the best part of the old engine and they are needed more
+// now, not less: a stem harvested out of a book is untrusted input, and that
+// machinery is what can vet it.
+//
+// Every stem is mined from the selected books -- there is no hand-written word
+// list anywhere in the engine. The legibility analysis is passed in as the
+// stem VET, which is the asymmetry that matters: cluster rules gate the
+// untrusted fragments going IN, and deliberately do not gate the assembled
+// compound coming out, because `ironspine` breaks those rules and still reads.
+//
+// Same contract the old generator had: (selection, seed) reproduces a batch.
+export const generateMorphemeBatch = (corpus, selection, opts = {}) => {
+  const { count = 24, seed = 1, parts = 2 } = opts
+  const vet = opts.vet ?? ((w) => legibilityReason(corpus, w))
+  const mined = opts.stems ?? (selection ? mineStems(corpus, selection, { ...opts, vet }) : null)
+  if (!mined) return []
+  return composeBatch({
+    ...opts,
+    count,
+    parts,
+    corpus,
+    rand: rng(seed),
+    heads: mined.heads,
+    tails: mined.tails,
+  })
 }
 
-// One-shot convenience for tests and for anyone asking "why was this dropped?".
-export const rejectReason = (corpus, parts, opts = {}) =>
-  makeNameFilter(corpus, opts)(Array.isArray(parts) ? parts : getSyllables(parts).map((s) => s.toLowerCase()))
-
-// ---------------------------------------------------------------- grafts
-//
-// The one thing in this file that does not come out of the prose, and the one
-// he explicitly unlocked: "it doesn't have to strictly come from the corpus".
-//
-// A corpus of English will not hand you a NAME ending, because English words do
-// not end the way names do. When the generator lands on one by accident --
-// `tarelsior`, `mithronian`, `gloleriel` -- the name suddenly reads as a person
-// rather than a misspelling. So a proportion of names get the ending grafted on
-// deliberately, onto a stem harvested the normal way.
-//
-// Every graft starts with a vowel and is only ever attached to a stem that ends
-// in a consonant, so the seam alternates by construction -- the graft cannot
-// manufacture the cluster the rules above just spent their time removing.
-export const GRAFTS = ['a', 'us', 'is', 'on', 'ar', 'or', 'el', 'ia', 'ara', 'iel', 'eth', 'ith']
-
-export const generateNames = (corpus, pool, opts = {}) => {
-  const { count = 24, seed = 1 } = opts
-  if (pool.length < 8) return []
-
-  const rand = rng(seed)
-  const randomInRange = (min, max) => Math.floor(rand() * (max - min + 1) + min)
-  const pick = (arr) => arr[randomInRange(0, arr.length - 1)]
-  const reject = makeNameFilter(corpus, opts)
-
-  // Position-correct pools, with a fallback. A single small author (Winnie-the-
-  // Pooh at rarity 3 has 32 distinct medial syllables) can thin a slot below
-  // the point where it produces variety rather than the same four names, so a
-  // slot that runs short borrows from the flat pool. Better a slightly English
-  // name than an empty screen -- and the filters below still apply either way.
-  const MIN_SLOT = 24
-  const big = (a) => a && a.length >= MIN_SLOT
-  const flat = pool
-  const initial = big(pool.initial) ? pool.initial : flat
-  const medial = big(pool.medial) ? pool.medial : big(pool.initial) ? pool.initial : flat
-  const final = big(pool.final) ? pool.final : flat
-
-  // He drew a uniform 2-4 syllables; both of his keepers came from that range
-  // (quarbet = 2, tornoromic = 4). Weighted to 3 after reading batches side by
-  // side: 3 syllables is where the good names live almost exclusively.
-  //
-  // The weights are not the distribution you get. The length cap rejects long
-  // draws afterwards, and it bites hardest on 4 -- weighting 2 and 4 equally
-  // with 3 produced batches that came out two-thirds DISYLLABIC and bland
-  // (`earaz, mirus, sogyn, vessom, vardo`). Over-weighting 3 and keeping 4 in
-  // the draw is what makes the surviving mix land near 4:21:5.
-  const shape = opts.shape ?? [2, 3, 3, 4]
-
-  const out = []
-  const seen = new Set()
-  const maxAttempts = count * 900
-
-  // One name in three takes a grafted ending.
-  //
-  // The proportion is the whole risk. Graft everything and the page turns into
-  // generic fantasy -- twenty-four names that all end -a/-us/-iel read as one
-  // name repeated. Graft none and the good endings only happen by luck. A third,
-  // spread over twelve endings, puts about eight grafted names in a 24-name
-  // batch across six or seven different endings, so no ending shows up twice on
-  // a screen and the other sixteen names still come entirely out of the prose.
-  // Read side by side, this is the point where the batch gained a register
-  // without gaining a house style.
-  const graftRate = opts.graftRate ?? 1 / 3
-
-  for (let a = 0; a < maxAttempts && out.length < count; a++) {
-    const n = shape[randomInRange(0, shape.length - 1)]
-    const parts = [pick(initial)]
-    for (let i = 1; i < n - 1; i++) parts.push(pick(medial))
-    if (rand() < graftRate) {
-      // The graft needs a consonant to land on; a stem ending in a vowel would
-      // make `tara`+`a`. Cheaper to redraw than to patch the seam.
-      if (/[aeiouy]$/.test(parts.join(''))) continue
-      parts.push(pick(GRAFTS))
-    } else parts.push(pick(final))
-    // The pools are pre-filtered by position, but reject() re-checks: a caller
-    // may hand us a plain array (tune.mjs, or anything built before positional
-    // pools existed) and the fallback above can borrow from the flat pool.
-    if (reject(parts)) continue
-    const w = parts.join('')
-    if (seen.has(w)) continue
-    seen.add(w)
-    out.push({ name: w, parts })
-  }
-  return out
-}
+// Re-exported so callers (app.js, the harnesses, the tests) have one import
+// site for "the generator" and do not each have to know the layering.
+export { mineStems, composeBatch, makeNameFilter, compoundEvidence }

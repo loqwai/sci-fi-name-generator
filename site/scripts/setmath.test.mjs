@@ -16,7 +16,7 @@ import { gunzipSync } from 'node:zlib'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SOURCES } from './corpora.mjs'
-import { DEFAULT_RECIPE, parseCorpus, selectWords, selectStages, countBits, syllablePool, generateNames } from '../src/engine.js'
+import { DEFAULT_RECIPE, parseCorpus, selectWords, selectStages, countBits, mineStems, legibilityReason, generateMorphemeBatch } from '../src/engine.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const corpus = parseCorpus(gunzipSync(await readFile(join(__dirname, '..', 'dist', 'corpus.bin'))).buffer)
@@ -168,8 +168,11 @@ test('PKD ∪ Asimov is not empty at any setting', () => {
 test('every single author on its own can still produce names', () => {
   const bad = []
   for (const id of IDS) {
-    const sel = selectWords(corpus, { include: [id], mode: 'all', exclude: [], rarity: 2 })
-    const names = generateNames(corpus, syllablePool(corpus, sel), { count: 8, seed: 3 })
+    // rarity 0: morpheme stems are harvested BEFORE the common-English cut,
+    // because the cut removes exactly the recognisable words a stem is made
+    // of. Harvesting a rarity-filtered set returns zero stems.
+    const sel = selectWords(corpus, { include: [id], mode: 'all', exclude: [], rarity: 0 })
+    const names = generateMorphemeBatch(corpus, sel, { count: 8, seed: 3 })
     if (!names.length) bad.push(id)
   }
   assert.deepEqual(bad, [], `these authors produced no names alone: ${bad.join(', ')}`)
@@ -188,13 +191,12 @@ test('every single author on its own can still produce names', () => {
 const BATCH = 24 // must match BATCH in app.js
 
 test('THE DEFAULT RECIPE fills a whole batch, on every seed', () => {
-  const sel = selectWords(corpus, DEFAULT_RECIPE)
-  const pool = syllablePool(corpus, sel)
+  const stems = mineStems(corpus, selectStages(corpus, DEFAULT_RECIPE, { vet: (w) => legibilityReason(corpus, w) }).afterExclude)
 
   // Not one lucky seed: the app picks a random one on every load and on every
   // ROLL AGAIN, so a default that only fills up sometimes is still broken.
   for (const seed of [1, 2, 3, 12345, 777, 31337, 20260815, 424242, 999999, 8080]) {
-    const names = generateNames(corpus, pool, { count: BATCH, seed })
+    const names = generateMorphemeBatch(corpus, null, { count: BATCH, seed, stems })
     assert.equal(
       names.length,
       BATCH,
@@ -202,24 +204,23 @@ test('THE DEFAULT RECIPE fills a whole batch, on every seed', () => {
     )
     for (const n of names) {
       assert.ok(n.name.length >= 5, `"${n.name}" is too short to be a name`)
-      assert.ok(n.parts.length >= 2, `"${n.name}" was not assembled from syllables`)
+      assert.equal(n.parts.length, 2, `"${n.name}" is not a head plus a tail`)
+      assert.equal(n.parts.join(''), n.name, `"${n.name}" does not spell its own parts`)
     }
   }
 })
 
 test('THE DEFAULT RECIPE keeps headroom at every stage', () => {
   const s = selectStages(corpus, DEFAULT_RECIPE)
-  const pool = syllablePool(corpus, s.final)
+  const stems = mineStems(corpus, s.afterExclude, { vet: (w) => legibilityReason(corpus, w) })
 
-  // Real values at the time of writing: 16,680 → 1,494 words → 3,945 syllables.
+  // Real values at the time of writing: 16,680 base words → 2,014 stems.
   // These floors sit far below that but far above "survived by two words", so
   // they fail on a genuine collapse rather than on ordinary corpus drift.
   assert.ok(countBits(s.base) > 5000, `base set is only ${countBits(s.base)} words`)
   assert.ok(countBits(s.final) > 500, `only ${countBits(s.final)} words survive the filters`)
-  assert.ok(pool.length > 1500, `only ${pool.length} syllables to build from`)
-
-  // generateNames gives up entirely below 8 syllables. State the margin.
-  assert.ok(pool.length > 8 * 20, 'the syllable pool is close to the generator floor')
+  assert.ok(stems.heads.length > 800, `only ${stems.heads.length} head stems to build from`)
+  assert.ok(stems.tails.length > 500, `only ${stems.tails.length} tail stems to build from`)
 })
 
 test('THE DEFAULT RECIPE fails safe: every ＋ tap makes the set bigger', () => {
@@ -235,7 +236,7 @@ test('THE DEFAULT RECIPE fails safe: every ＋ tap makes the set bigger', () => 
     const after = countBits(selectWords(corpus, r))
     assert.ok(after >= before, `adding ${id} shrank the set: ${before} → ${after}`)
 
-    const names = generateNames(corpus, syllablePool(corpus, selectWords(corpus, r)), {
+    const names = generateMorphemeBatch(corpus, selectStages(corpus, r).afterExclude, {
       count: BATCH,
       seed: 7,
     })

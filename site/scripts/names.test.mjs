@@ -2,11 +2,10 @@
 // Name QUALITY, as opposed to set-algebra correctness.
 //
 // No test can tell you a name is good -- that was settled by reading batches.
-// What a test CAN do is hold the line under the good names: every one of these
-// assertions is a specific bad name he was actually served, or a specific good
-// one he actually accepted. The suite exists so that the next person to tune
-// the generator finds out immediately that they have re-broken `mationcity` or
-// filtered away `quarbet`.
+// What a test CAN do is hold the line under the good names, and pin the
+// arguments the design rests on. Every assertion here is either a name that
+// was really produced, a rule the output depends on, or a measured fact about
+// the corpus that decides what is possible at all.
 //
 //   node --test scripts/names.test.mjs
 
@@ -19,199 +18,278 @@ import { fileURLToPath } from 'node:url'
 import {
   DEFAULT_RECIPE,
   parseCorpus,
-  selectWords,
-  syllablePool,
-  generateNames,
-  rejectReason,
-  getSyllables,
+  selectStages,
+  mineStems,
+  composeBatch,
+  compoundEvidence,
+  generateMorphemeBatch,
+  makeNameFilter,
   legibilityReason,
   clusterInventory,
   consonantUnits,
-  GRAFTS,
+  getSyllables,
+  rng,
 } from '../src/engine.js'
+import { seamReason } from '../src/morphemes.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const corpus = parseCorpus(gunzipSync(await readFile(join(__dirname, '..', 'dist', 'corpus.bin'))).buffer)
 
-// A spread wide enough that a filter which only works on Lovecraft gets caught:
-// a tiny intersection, a single huge author, a union, and the deliberately
-// worst case of no common-English filter at all.
+const vet = (w) => legibilityReason(corpus, w)
+
+// A spread wide enough that a rule which only works on Lovecraft gets caught:
+// a union, a single huge author, a tiny one, and a modern pair.
 const RECIPES = [
   { t: 'default', ...DEFAULT_RECIPE },
-  { t: 'stoker ∩ lovecraft r1', include: ['stoker', 'lovecraft'], mode: 'all', exclude: [], rarity: 1 },
-  { t: 'lovecraft r2', include: ['lovecraft'], mode: 'all', exclude: [], rarity: 2 },
-  { t: 'pkd ∪ asimov r2', include: ['pkd', 'asimov'], mode: 'any', exclude: [], rarity: 2 },
-  { t: 'shakespeare r2', include: ['shakespeare'], mode: 'all', exclude: [], rarity: 2 },
-  { t: 'homer ∩ myths r2', include: ['homer', 'myths'], mode: 'all', exclude: [], rarity: 2 },
-  { t: 'lovecraft, no rarity', include: ['lovecraft'], mode: 'all', exclude: [], rarity: 0 },
+  { t: 'shakespeare', include: ['shakespeare'], mode: 'all', exclude: [], rarity: 0 },
+  { t: 'pooh', include: ['pooh'], mode: 'all', exclude: [], rarity: 0 },
+  { t: 'pkd ∪ asimov', include: ['pkd', 'asimov'], mode: 'any', exclude: [], rarity: 0 },
+  { t: 'austen ∖ dickens', include: ['austen'], mode: 'all', exclude: ['dickens'], rarity: 0 },
 ]
 
 const batches = RECIPES.map((r) => {
-  const pool = syllablePool(corpus, selectWords(corpus, r))
-  // Kept per seed as well as flattened: a batch is one screenful, and
-  // "no repeats" is a promise about a screen, not about four screens stacked.
-  const screens = [1, 7, 12345, 99999].map((seed) => generateNames(corpus, pool, { count: 24, seed }))
-  return { r, pool, screens, names: screens.flat() }
+  const sel = selectStages(corpus, r).afterExclude
+  const stems = mineStems(corpus, sel, { vet })
+  // Kept per seed as well as flattened: a batch is one screenful, and "no
+  // repeats" is a promise about a screen, not about four screens stacked.
+  const screens = [1, 7, 12345, 99999].map((seed) =>
+    generateMorphemeBatch(corpus, null, { count: 24, seed, stems }),
+  )
+  return { r, stems, screens, names: screens.flat() }
 })
 const everyName = batches.flatMap((b) => b.names)
 
-// ---------------------------------------------------------------- regressions
+// -------------------------------------------------------------- the anchor
+//
+// `hypnodroid` is the one name out of this whole project anybody kept, and it
+// is the acceptance criterion for the method. These three tests are the honest
+// version of "can the engine emit it", and the honesty matters because the
+// answer is not a simple yes.
 
-// Verbatim, from the batches he rejected. Every one is the same failure --
-// visible English morphology glued on -- and every one was produced by a
-// generator that barred affixes in FIRST position only.
-const REJECT = [
-  'mationcity',   // ma+TION+CITY  -- suffix in the middle, whole word on the end
-  'fieltusing',   // fielt+us+ING
-  'untruness',    // UN+tru+NESS   -- affixed at both ends
-  'manchoship',   // MAN+cho+SHIP  -- and the syllable split hides the -ship
-  'headser',      // HEAD+ser      -- a whole common word with a syllable stuck on
-  'dosmomalboys', // dos+mo+mal+BOYS
-  'tomoty',       // to+mo+TY
-]
-
-// His own accepted output, plus the good names from the batch that prompted
-// this work. These are the reason the filters are not simply cranked harder:
-// `quarbet` is quar+BET and `bet` is a real English word, so the naive version
-// of the common-word rule deletes the target.
-const KEEP = ['tornoromic', 'quarbet', 'hirmitor', 'thalis', 'terskiel', 'orros', 'narai']
-
-test('the rejected names can no longer be produced', () => {
-  for (const name of REJECT) {
-    const reason = rejectReason(corpus, name)
-    assert.ok(reason, `"${name}" is accepted again -- it was one of the names he rejected`)
-  }
+test('TRIPWIRE: the composer joins hypno + droid into hypnodroid', () => {
+  // This is the mechanism test. Given the two morphemes, the seam rule, the
+  // filter and the assembler must produce exactly `hypnodroid` -- clean seam
+  // (vowel meets consonant), not a real word, not rejected. If composition
+  // ever breaks, this goes red first.
+  assert.equal(seamReason('hypno', 'droid'), null)
+  const names = composeBatch({
+    count: 1,
+    rand: rng(1),
+    corpus,
+    heads: [{ form: 'hypno', score: 1 }],
+    tails: [{ form: 'droid', score: 1 }],
+  })
+  assert.deepEqual(names.map((n) => n.name), ['hypnodroid'])
+  assert.deepEqual(names[0].parts, ['hypno', 'droid'])
 })
 
-test('his accepted names still survive every filter', () => {
-  for (const name of KEEP) {
-    const reason = rejectReason(corpus, name)
-    assert.equal(reason, null, `"${name}" is an accepted name but the generator now rejects it: ${reason}`)
-  }
+test('MEASURED FACT: this corpus cannot supply `droid`, so it cannot mine hypnodroid', () => {
+  // The uncomfortable finding, pinned so nobody re-litigates it from memory.
+  // The library is 19th-century literary fiction plus the Kabbalah. `-droid`
+  // is modern sci-fi shrapnel -- Asimov wrote "robot" -- and it appears in
+  // ZERO words across all 58 sources. `hypno-` does exist, as a word-initial
+  // fragment of `hypnotic`/`hypnotism`.
+  //
+  // So: the METHOD reaches hypnodroid, the DATA does not. Fixing that is a
+  // corpus change (add a text containing the vocabulary), not a code change.
+  assert.equal(corpus.words.filter((w) => w.includes('droid')).length, 0)
+  assert.ok(corpus.words.filter((w) => w.startsWith('hypno')).length >= 5)
+  assert.equal(corpus.wordSet.has('hypno'), false, 'hypno is a fragment, not a standalone word')
 })
 
-test('no generated name ends in English morphology', () => {
-  // The failure this whole change exists to fix. Checked against the finished
-  // string, not the syllables, because the splitter cuts `manchoship` as
-  // man|chos|hip and the -ship is invisible at the seam.
-  const SUFFIX = /(?:tion|sion|ness|ment|ance|ence|ship|hood|ward|ful|less|able|ible|ing|ism|ist|ity|ous|est|ly|ed|er|ers|ies|ish|y)$/
-  const bad = everyName.filter((n) => SUFFIX.test(n.name))
-  assert.deepEqual(bad.map((n) => n.name), [], `${bad.length} name(s) end in an English suffix`)
+test('the old engine could not even SPELL hypnodroid', () => {
+  // Why the syllable path was removed rather than tuned. The syllabifier cuts
+  // on vowel clusters, straight through the seam that makes the name work.
+  assert.deepEqual(getSyllables('hypnodroid'), ['hyp', 'nod', 'roid'])
+  // …and the old pool capped syllables at 4 letters, so `droid` was dropped.
+  assert.ok('droid'.length > 4)
 })
 
-test('no generated name contains a whole obvious English word as a segment', () => {
-  // `mationcity` is "city" with a prefix stuck on; `headser` is "head".
-  const bad = []
-  for (const n of everyName) {
-    for (let i = 0; i < n.parts.length; i++) {
-      let run = ''
-      for (let j = i; j < n.parts.length; j++) {
-        run += n.parts[j]
-        if (run.length < 3 || run === n.name) continue
-        const wi = corpus.words.indexOf(run)
-        // Same two tiers the engine uses: any real word spelled by more than
-        // one syllable, or a very common one spelled by a single syllable.
-        if (wi < 0) continue
-        const common = i === j ? (run.length >= 4 ? corpus.df[wi] >= 6 : corpus.df[wi] >= 20) : corpus.df[wi] >= 6
-        if (common) bad.push(`${n.name} (${n.parts.join('+')} -> "${run}")`)
-      }
-    }
-  }
-  assert.deepEqual(bad, [], `${bad.length} name(s) contain a whole English word`)
-})
-
-test('syllables are only used in the position they were observed in', () => {
-  // -tion never begins a real word, so a pool that recorded position cannot
-  // offer it as an opening. Note the asymmetry, which is real and not a bug:
-  // `re`, `un`, `in` and `be` DO legitimately end English words (more, begun,
-  // within, tribe), so they stay in the final pool and are barred only from
-  // the opening, where they read as prefixes.
-  for (const { r, pool } of batches) {
-    assert.ok(pool.initial && pool.medial && pool.final, `${r.t}: positional pools were not built`)
-    for (const s of ['tion', 'ness', 'ing', 'ship', 'ment', 'ous', 'est', 'ish', 'ity'])
-      assert.ok(!pool.initial.includes(s), `${r.t}: "${s}" is offered as an OPENING syllable`)
-    for (const s of ['un', 're', 'dis', 'pre', 'mis', 'in', 'ex'])
-      assert.ok(!pool.initial.includes(s), `${r.t}: prefix "${s}-" is offered as an OPENING syllable`)
-    // Pure grammar is barred from every slot, including the middle -- that is
-    // the leak that produced ma+TION+ci+ty.
-    for (const s of ['tion', 'ness', 'ing', 'ship', 'ment', 'ly', 'ed'])
-      for (const slot of ['initial', 'medial', 'final'])
-        assert.ok(!pool[slot].includes(s), `${r.t}: "${s}" survives in the ${slot} pool`)
-  }
-})
-
-test('every recipe still fills a whole 24-name batch', () => {
-  // Filtering hard enough would leave only safe, forgettable output -- or none.
-  // This is the guard on over-correcting: the counts have to survive too.
-  for (const { r } of RECIPES.map((x) => ({ r: x }))) {
-    const pool = syllablePool(corpus, selectWords(corpus, r))
-    for (const seed of [1, 2, 3]) {
-      const names = generateNames(corpus, pool, { count: 24, seed })
-      assert.equal(names.length, 24, `${r.t} @seed ${seed} produced only ${names.length}/24`)
-    }
-  }
-})
-
-test('names stay in the shape and length his keepers had', () => {
-  // quarbet is 7 chars / 2 syllables, tornoromic 10 / 4. Nothing outside that.
-  for (const n of everyName) {
-    assert.ok(n.name.length >= 5 && n.name.length <= 10, `"${n.name}" is ${n.name.length} chars`)
-    assert.ok(n.parts.length >= 2 && n.parts.length <= 4, `"${n.name}" has ${n.parts.length} syllables`)
-    assert.ok(/^[a-z]+$/.test(n.name), `"${n.name}" is not plain lowercase letters`)
-  }
-})
-
-test('three syllables is the commonest shape, and four still happens', () => {
-  // Read side by side, 3-syllable names were where nearly all the good ones
-  // were; 2-syllable batches came out bland. But tornoromic is FOUR, so the
-  // long shape must not be tuned out of existence.
-  const hist = {}
-  for (const n of everyName) hist[n.parts.length] = (hist[n.parts.length] ?? 0) + 1
-  assert.ok(hist[3] > hist[2], `2-syllable names dominate (${JSON.stringify(hist)})`)
-  assert.ok(hist[4] > 0, `no 4-syllable names at all -- tornoromic could not be produced (${JSON.stringify(hist)})`)
-})
+// -------------------------------------------------------------- no censorship
 
 test('obscenity is NOT filtered -- the generator does not censor', () => {
-  // Inverted deliberately. This test used to assert that no generated name
-  // matched an OBSCENE substring list. The owner's instruction was explicit --
-  // "I like obscenity don't censor things" -- so the list and its check were
-  // deleted from the engine, and this assertion now guards the opposite: that
-  // nobody quietly reintroduces the filter. These are the exact two names that
-  // prompted it, and both must remain producible.
-  //
-  // Note this is a rule about OBSCENITY only. Rude-looking names are still
-  // subject to every other filter on their merits -- `cockrel` is rejected for
-  // the unreadable "ck|r" seam, `wankor` for containing "wan" -- and that is
-  // the legibility machinery doing its job, not censorship.
-  for (const name of ['machoanal', 'stipoganal']) {
-    assert.equal(rejectReason(corpus, name), null, `"${name}" is rejected -- an obscenity filter is back`)
+  // Inverted deliberately. An obscenity list was deleted from the engine at
+  // the owner's explicit instruction -- "I like obscenity don't censor
+  // things" -- and this assertion guards the opposite: that nobody quietly
+  // reintroduces one. Rude compounds must survive on their merits like any
+  // other, judged only by seam, length and already-a-word.
+  // Seams chosen to be LEGAL, so that a rejection can only mean censorship.
+  // (`ass|droid` and `cock|spire` are both cut for piling four consonants at
+  // the seam -- that is the legibility rule doing its job to everyone alike,
+  // and it would make a useless test of this.)
+  const reject = makeNameFilter(corpus)
+  for (const parts of [['shit', 'wagon'], ['piss', 'gate'], ['fuck', 'line'], ['ass', 'helm']]) {
+    assert.equal(reject(parts), null, `"${parts.join('')}" is rejected -- an obscenity filter is back`)
   }
+})
+
+// -------------------------------------------------------------- mining
+
+test('mining excludes what is not a word', () => {
+  // Every one of these really leaked into a batch: `peacexxiii`, `cottonfifty`,
+  // `londonaught`, and the apostrophe debris `doesn`.
+  const forms = new Set(batches.flatMap((b) => b.stems.heads.map((h) => h.form)))
+  for (const junk of ['xxiii', 'viii', 'iii', 'fifty', 'aught', 'naught', 'doesn', 'mightn', 'wouldn'])
+    assert.ok(!forms.has(junk), `"${junk}" was mined as a stem`)
+})
+
+test('mining excludes inflected forms and function words', () => {
+  const forms = new Set(batches.flatMap((b) => b.stems.heads.map((h) => h.form)))
+  for (const w of ['hunters', 'walked', 'running', 'quickly', 'the', 'their', 'which'])
+    assert.ok(!forms.has(w), `"${w}" is not a stem`)
+})
+
+test('there is no hand-written stem list -- every stem comes from the books', () => {
+  // The owner's instruction was "purely drawn from the corpuses". A stem that
+  // is not in the vocabulary would mean curation crept back in.
+  for (const { r, stems } of batches)
+    for (const s of [...stems.heads, ...stems.tails])
+      assert.ok(corpus.wordSet.has(s.form), `${r.t}: "${s.form}" is not a corpus word`)
+})
+
+test('the books actually change the stems -- the pickers are not decoration', () => {
+  // This is the test that fails if anyone reintroduces a fixed inventory, and
+  // it is also the test that caught mining from `stages.final` (which returned
+  // zero stems and made every recipe identical).
+  const setOf = (b) => new Set(b.stems.heads.map((h) => h.form))
+  const pooh = setOf(batches.find((b) => b.r.t === 'pooh'))
+  const shake = setOf(batches.find((b) => b.r.t === 'shakespeare'))
+  assert.ok(pooh.size > 50, `pooh only mined ${pooh.size} stems`)
+  const onlyShake = [...shake].filter((w) => !pooh.has(w))
+  assert.ok(onlyShake.length > 200, `only ${onlyShake.length} stems separate Shakespeare from Pooh`)
+})
+
+test('stems are vetted for legibility on the way IN', () => {
+  // The deliberate asymmetry. Cluster rules gate the untrusted fragments
+  // entering the inventory; they do NOT gate the assembled compound, because
+  // `ironspine` breaks them and still reads. If the vet is dropped, this goes
+  // red without touching the seam rules.
+  for (const { r, stems } of batches)
+    for (const s of stems.heads)
+      assert.equal(vet(s.form), null, `${r.t}: unreadable stem "${s.form}" got in`)
+})
+
+test('position evidence is learned from real compounds, not declared', () => {
+  const ev = compoundEvidence(corpus)
+  // `moonlight` = moon + light, `seaside` = sea + side. English tells us which
+  // words lead and which follow; nobody typed these.
+  assert.ok(ev.tail.get('light') > 0, 'light has no evidence as a tail')
+  assert.ok(ev.tail.get('land') > 0, 'land has no evidence as a tail')
+  assert.ok(ev.head.get('sea') > 0, 'sea has no evidence as a head')
+  assert.ok(ev.head.get('sun') > 0, 'sun has no evidence as a head')
+  // Derivational endings dominate the raw counts and must be barred from the
+  // tail slot, or every name reads as a word that lost its front half.
+  const tails = new Set(batches.flatMap((b) => b.stems.tails.map((t) => t.form)))
+  for (const w of ['less', 'able', 'ness', 'ment', 'ous'])
+    assert.ok(!tails.has(w), `"-${w}" is offered as a tail`)
+})
+
+// -------------------------------------------------------------- the seam
+
+test('a seam that runs two vowels together is cut', () => {
+  assert.match(seamReason('sea', 'oath'), /two vowels/)
+})
+
+test('a doubled letter at the seam is cut', () => {
+  assert.match(seamReason('veil', 'light'), /doubles l/)
+  assert.match(seamReason('salt', 'tide'), /doubles t/)
+})
+
+test('a genuine pile-up is cut', () => {
+  assert.match(seamReason('salt', 'sphere'), /piles 5/)
+  assert.match(seamReason('hand', 'shrine'), /piles 5/)
+  assert.match(seamReason('veil', 'sphere'), /piles 4/)
+})
+
+test('THE POINT: compound seams English uses are KEPT', () => {
+  // engine.js would never spell `ftw` or `nsp` inside one invented word and it
+  // is right not to. In a compound the reader recognises both halves, so the
+  // cluster costs nothing. If this flips, the generator has collapsed back
+  // into the syllable engine and there is no reason for it to exist.
+  assert.equal(seamReason('drift', 'wake'), null) // ft|w
+  assert.equal(seamReason('iron', 'spine'), null) // n|sp
+  assert.equal(seamReason('moth', 'wake'), null) // th|w
+  assert.equal(seamReason('hypno', 'droid'), null) // the anchor: vowel|dr
+})
+
+// -------------------------------------------------------------- batches
+
+test('every recipe fills a whole 24-name batch, on every seed', () => {
+  for (const { r, screens } of batches)
+    for (const [i, s] of screens.entries())
+      assert.equal(s.length, 24, `${r.t}: screen ${i} made only ${s.length}/24`)
 })
 
 test('a batch is not the same name over and over', () => {
-  // The cheapest way to pass every filter above is to collapse the output.
   for (const { r, screens, names } of batches) {
     for (const s of screens) {
       const uniq = new Set(s.map((n) => n.name))
       assert.equal(uniq.size, s.length, `${r.t}: duplicate names in one batch`)
     }
-    // Across four screens the engine promises nothing -- it dedupes per batch,
-    // so an occasional birthday collision is honest rather than a fault. What
-    // would NOT be honest is the output space quietly collapsing as the filters
-    // tighten, so this asks for 95% and catches that without being flaky.
     const across = new Set(names.map((n) => n.name))
-    assert.ok(across.size >= names.length * 0.95,
-      `${r.t}: only ${across.size} distinct names across ${names.length} -- the output space is collapsing`)
-    const openings = new Set(names.map((n) => n.parts[0]))
-    assert.ok(openings.size > names.length / 4, `${r.t}: only ${openings.size} distinct openings in ${names.length} names`)
+    assert.ok(
+      across.size >= names.length * 0.95,
+      `${r.t}: only ${across.size} distinct across ${names.length} -- the space is collapsing`,
+    )
   }
 })
 
-// ------------------------------------------------------------- legibility
+test('no head repeats within a screen', () => {
+  // The eye reads down the left edge of a list, so two names starting the same
+  // way look like a bug.
+  for (const { r, screens } of batches)
+    for (const s of screens) {
+      const heads = s.map((n) => n.parts[0])
+      assert.equal(new Set(heads).size, heads.length, `${r.t}: a head repeated in one screen`)
+    }
+})
+
+test('every name spells its own parts, and is a compound not a word', () => {
+  for (const n of everyName) {
+    assert.equal(n.parts.join(''), n.name)
+    assert.equal(n.parts.length, 2)
+    assert.ok(!corpus.wordSet.has(n.name), `"${n.name}" is already an English word`)
+    assert.ok(n.name.length >= 6 && n.name.length <= 14, `"${n.name}" is a bad length`)
+  }
+})
+
+test('a seed reproduces its batch, and different seeds differ', () => {
+  const sel = selectStages(corpus, DEFAULT_RECIPE).afterExclude
+  const stems = mineStems(corpus, sel, { vet })
+  const a = generateMorphemeBatch(corpus, null, { count: 24, seed: 12345, stems }).map((n) => n.name)
+  const b = generateMorphemeBatch(corpus, null, { count: 24, seed: 12345, stems }).map((n) => n.name)
+  const c = generateMorphemeBatch(corpus, null, { count: 24, seed: 999, stems }).map((n) => n.name)
+  assert.deepEqual(a, b)
+  assert.notDeepEqual(a, c)
+})
+
+test('the morpheme count is honoured, and 3 works', () => {
+  const sel = selectStages(corpus, DEFAULT_RECIPE).afterExclude
+  const stems = mineStems(corpus, sel, { vet })
+  for (const parts of [2, 3]) {
+    const names = generateMorphemeBatch(corpus, null, { count: 24, seed: 5, stems, parts })
+    assert.equal(names.length, 24, `parts=${parts} made only ${names.length}`)
+    for (const n of names) assert.equal(n.parts.length, parts, `"${n.name}" has ${n.parts.length} parts`)
+  }
+})
+
+test('the output space is big enough not to be exhausted', () => {
+  // The whole risk of moving off syllables. The old engine scored 18,757
+  // distinct over 40 seeds x 500 and was not saturated; a curated inventory
+  // scored a few hundred, which is why curation was abandoned.
+  const sel = selectStages(corpus, DEFAULT_RECIPE).afterExclude
+  const stems = mineStems(corpus, sel, { vet })
+  const seen = new Set()
+  for (let seed = 1; seed <= 10; seed++)
+    for (const n of generateMorphemeBatch(corpus, null, { count: 500, seed, stems })) seen.add(n.name)
+  assert.ok(seen.size > 4000, `only ${seen.size} distinct names over 10 x 500`)
+})
+
+// -------------------------------------------------------------- legibility
 //
-// The second pass. The names above are about output not being GARBAGE; these
-// are about the survivors being READABLE -- said right, at a glance, first try.
-// Every string in HARD is one he pointed at, or one the batch actually served.
+// The surviving half of the old engine, and it is load-bearing: it is what
+// vets a mined stem. Every string in HARD is one he pointed at, or one a batch
+// actually served.
 
 const HARD = [
   ['posculdex', 'two clusters (sc, ld) in nine letters'],
@@ -229,138 +307,27 @@ const HARD = [
   ['zrmilon', 'zrm- opens nothing'],
 ]
 
-// The counterweight, and the whole risk of this change. `tornoromic` is STRANGE
-// and readable at the same time -- that is the target, not blandness. `galce`,
-// `algel` and `coelim` are the three he picked out of the live batch as the
-// good ones; `terskiel` needs the r|sk seam to stay legal, and `narai` needs a
-// word-final `ai`. Tune the thresholds one notch tighter and these start dying.
 const READABLE = [
   'tornoromic', 'quarbet', 'galce', 'algel', 'coelim', 'terskiel', 'narai',
   'thalis', 'orros', 'hirmitor', 'trinocal', 'wilvetur', 'tarelsior',
   'mithronian', 'gloleriel', 'proerius', 'strovan',
 ]
 
-test('the names that are hard to READ are rejected', () => {
+test('the fragments that are hard to READ are rejected', () => {
   for (const [name, why] of HARD)
     assert.ok(legibilityReason(corpus, name), `"${name}" is still accepted -- ${why}`)
 })
 
-test('strange but readable names survive the legibility rules', () => {
+test('strange but readable fragments survive the legibility rules', () => {
   for (const name of READABLE)
     assert.equal(legibilityReason(corpus, name), null, `"${name}" was filtered as hard to read`)
 })
 
-test('every generated name uses clusters English uses IN THAT POSITION', () => {
+test('the cluster inventory is built from English, not declared', () => {
   const inv = clusterInventory(corpus)
-  const bad = []
-  for (const n of everyName) {
-    const runs = /[^aeiouy]+/g
-    let m
-    while ((m = runs.exec(n.name))) {
-      const seg = m[0]
-      if (seg.length < 2) continue
-      const atStart = m.index === 0
-      const atEnd = m.index + seg.length === n.name.length
-      if (atStart && !inv.initial.has(seg)) bad.push(`${n.name}: "${seg}-" never opens an English word`)
-      else if (atEnd && !inv.final.has(seg)) bad.push(`${n.name}: "-${seg}" never ends one`)
-    }
-  }
-  assert.deepEqual(bad, [], `${bad.length} name(s) use a cluster in a position English does not`)
-})
-
-test('no generated name stacks more than two consonant sounds in one syllable', () => {
-  // "Cap clusters at 2" is a cap per SYLLABLE, not per letter-run -- which is
-  // the only reading under which English itself passes, and the only one that
-  // keeps `terskiel`. Its `rsk` is three sounds, but a syllable boundary sits
-  // inside it (ters|kiel) and neither side holds more than two.
-  //
-  // Letters are also the wrong unit: `th` and `ck` are one sound each, so
-  // `thalis` and `parvack` are not clusters at all.
-  const inv = clusterInventory(corpus)
-  const onsetOk = (s) => s.length < 2 || inv.initial.has(s)
-  const codaOk = (s) => s.length < 2 || inv.final.has(s)
-  const bad = []
-  for (const n of everyName) {
-    const runs = /[^aeiouy]+/g
-    let m
-    while ((m = runs.exec(n.name))) {
-      const seg = m[0]
-      if (consonantUnits(seg).length < 3) continue
-      const atStart = m.index === 0
-      const atEnd = m.index + seg.length === n.name.length
-      // Word-initially English really does have str-, spr-, scr- and spl-.
-      if (atStart && inv.initial.has(seg)) continue
-      if (atStart || atEnd) {
-        bad.push(`${n.name}: "${seg}" is ${consonantUnits(seg).length} sounds at the edge of the word`)
-        continue
-      }
-      const split = [...Array(seg.length - 1).keys()]
-        .map((i) => [seg.slice(0, i + 1), seg.slice(i + 1)])
-        .some(([coda, onset]) =>
-          consonantUnits(coda).length <= 2 && consonantUnits(onset).length <= 2 && codaOk(coda) && onsetOk(onset))
-      if (!split) bad.push(`${n.name}: "${seg}" has nowhere legal to put a syllable boundary`)
-    }
-  }
-  assert.deepEqual(bad, [], `${bad.length} name(s) pile up consonants`)
-})
-
-test('names alternate consonant and vowel: one cluster per five letters', () => {
-  // The shape rule. `galce` (5 letters, 1 cluster) spends its whole budget and
-  // is fine; `posculdex` (9 letters, 2 clusters) wants ten letters and has not
-  // got them, which is exactly why it reads as a mouthful.
-  const bad = []
-  for (const n of everyName) {
-    const clusters = (n.name.match(/[^aeiouy]+/g) ?? []).filter((s) => consonantUnits(s).length >= 2).length
-    if (clusters * 5 > n.name.length) bad.push(`${n.name}: ${clusters} clusters in ${n.name.length} letters`)
-  }
-  assert.deepEqual(bad, [], `${bad.length} name(s) break the alternation budget`)
-})
-
-test('no generated name contains a vowel pile-up', () => {
-  const bad = everyName.filter((n) => /[aeiouy]{3}/.test(n.name)).map((n) => n.name)
-  assert.deepEqual(bad, [], 'name(s) with three vowels in a row')
-})
-
-test('grafted endings land on a PROPORTION of names, and vary', () => {
-  // The failure mode of grafting is monotony: graft every name and twenty-four
-  // results all ending -a/-us/-iel read as one name printed twice. So this
-  // asserts a band, not a floor -- too many grafts fails as loudly as none --
-  // and that no single ending owns the batch.
-  const graft = new Set(GRAFTS)
-  const used = everyName.filter((n) => graft.has(n.parts[n.parts.length - 1]))
-  const share = used.length / everyName.length
-  assert.ok(share > 0.1, `only ${(share * 100).toFixed(1)}% of names take a graft -- the endings are not landing`)
-  assert.ok(share < 0.45, `${(share * 100).toFixed(1)}% of names take a graft -- the output will read as generic fantasy`)
-
-  const hist = {}
-  for (const n of used) hist[n.parts[n.parts.length - 1]] = (hist[n.parts[n.parts.length - 1]] ?? 0) + 1
-  assert.ok(Object.keys(hist).length >= 8, `only ${Object.keys(hist).length} distinct endings in use: ${JSON.stringify(hist)}`)
-  const commonest = Math.max(...Object.values(hist))
-  assert.ok(commonest / used.length < 0.3, `one ending is ${((commonest / used.length) * 100).toFixed(0)}% of all grafts: ${JSON.stringify(hist)}`)
-})
-
-test('a graft never lands on a vowel, and -eth still bars the verbs', () => {
-  const graft = new Set(GRAFTS)
-  for (const n of everyName) {
-    const last = n.parts[n.parts.length - 1]
-    if (!graft.has(last)) continue
-    const stem = n.parts.slice(0, -1).join('')
-    assert.ok(/[^aeiouy]$/.test(stem), `"${n.name}" grafted "${last}" onto the vowel-final stem "${stem}"`)
-  }
-  // -eth is available as a name ending…
-  assert.equal(rejectReason(corpus, ['kel', 'eth']), null)
-  // …but not as a conjugation. That is why `eth` moved out of BARRED_FINAL_RE
-  // and into INFLECTIONS: the pattern barred both, the stem check bars only the
-  // verb. Neither `glareth` nor `tradeth` is in the vocabulary, so the "is a
-  // real word" rule cannot be what catches them -- it has to be the stem
-  // underneath, which is the mechanism this is here to hold down.
-  for (const verb of [['glar', 'eth'], ['trad', 'eth']]) {
-    assert.ok(!corpus.wordSet.has(verb.join('')), `${verb.join('')} is in the vocabulary -- pick another verb`)
-    assert.ok(rejectReason(corpus, verb), `"${verb.join('')}" is accepted -- -eth is no longer checked as a conjugation`)
-  }
-})
-
-test('rejectReason accepts a finished name as well as parts', () => {
-  assert.equal(rejectReason(corpus, getSyllables('tornoromic').map((s) => s.toLowerCase())), null)
-  assert.ok(rejectReason(corpus, 'untruness'))
+  assert.ok(inv.initial.has('tr') && inv.initial.has('st'), 'tr- and st- must open words')
+  assert.ok(inv.final.has('nd'), '-nd must end words')
+  assert.ok(!inv.initial.has('zrm'), 'zrm- opens nothing')
+  assert.deepEqual(consonantUnits('str'), ['s', 't', 'r'])
+  assert.deepEqual(consonantUnits('ngth'), ['ng', 'th'])
 })

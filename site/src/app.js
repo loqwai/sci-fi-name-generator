@@ -4,9 +4,10 @@ import {
   selectWords,
   selectStages,
   wordsIn,
-  wordsWithSyllable,
-  syllablePool,
-  generateNames,
+  wordsWithStem,
+  mineStems,
+  legibilityReason,
+  generateMorphemeBatch,
   countBits,
 } from './engine.js'
 
@@ -26,6 +27,10 @@ const state = {
   corpus: null,
   recipe: freshRecipe(),
   seed: (Math.random() * 1e9) | 0,
+  // How many morphemes per name. 2 is the default and the good case; 3 is
+  // offered and reads noticeably worse (see the sample harness), which is why
+  // it is an option rather than a range. 1 would just be a corpus word.
+  parts: 2,
   kept: [],
   poolCache: new Map(),
 }
@@ -94,6 +99,8 @@ const readUrl = () => {
   }
   const s = parseInt(h.get('s') ?? '', 10)
   if (Number.isFinite(s)) state.seed = s
+  const p = parseInt(h.get('p') ?? '', 10)
+  if (p === 2 || p === 3) state.parts = p
 }
 
 const writeUrl = () => {
@@ -104,6 +111,7 @@ const writeUrl = () => {
   p.set('m', mode)
   p.set('r', String(rarity))
   p.set('s', String(state.seed))
+  p.set('p', String(state.parts))
   history.replaceState(null, '', '#' + p.toString())
 }
 
@@ -267,6 +275,12 @@ const renderControls = () => {
   for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.mode === mode)
   for (const b of $('raritySeg').children)
     b.classList.toggle('on', Number(b.dataset.rarity) === rarity)
+  for (const b of $('partsSeg').children)
+    b.classList.toggle('on', Number(b.dataset.parts) === state.parts)
+  $('partsGloss').textContent =
+    state.parts === 2
+      ? 'two morphemes — `stonyskill`, `lockwit`. The good case.'
+      : 'three — `ravencountkin`. Longer, and harder to read.'
   renderExpr()
 }
 
@@ -366,14 +380,14 @@ const renderTrace = (n) => {
   h.append(nm, document.createTextNode(' came from'))
   el.append(h)
 
-  for (const syl of n.parts) {
+  for (const stem of n.parts) {
     const row = document.createElement('div')
     row.className = 'trace-syl'
     const b = document.createElement('b')
-    b.textContent = syl
+    b.textContent = stem
     const i = document.createElement('i')
-    const src = wordsWithSyllable(state.corpus, stages.final, syl, 6)
-    i.textContent = src.length ? '← ' + src.join(', ') : '← (in the set)'
+    const src = wordsWithStem(state.corpus, stages.afterExclude, stem, 6)
+    i.textContent = src.length ? '← ' + src.join(', ') : '← curated stem'
     row.append(b, i)
     el.append(row)
   }
@@ -400,7 +414,7 @@ const stageChain = () => {
   return out
 }
 
-const renderStatus = (pool, nameCount) => {
+const renderStatus = (stems, nameCount) => {
   const status = $('status')
   status.innerHTML = ''
   status.classList.remove('warn')
@@ -422,7 +436,7 @@ const renderStatus = (pool, nameCount) => {
   }
   const tail = document.createElement('span')
   tail.className = 'arrow'
-  tail.textContent = ` → ${pool.length.toLocaleString()} syllables`
+  tail.textContent = ` → ${stems.heads.length.toLocaleString()} stems`
   status.append(tail)
 
   const jump = document.createElement('a')
@@ -431,11 +445,11 @@ const renderStatus = (pool, nameCount) => {
   jump.textContent = 'see the words ▸'
   status.append(jump)
 
-  if (nameCount === 0) explainEmpty(chain, pool)
+  if (nameCount === 0) explainEmpty(chain, stems)
 }
 
 // Say which operation emptied it, and offer the control that undoes the damage.
-const explainEmpty = (chain, pool) => {
+const explainEmpty = (chain, stems) => {
   const status = $('status')
   status.classList.add('warn')
   const { mode, include, rarity } = state.recipe
@@ -451,22 +465,20 @@ const explainEmpty = (chain, pool) => {
   why.className = 'why'
   const first = chain[0]
 
-  if (culprit && /common/.test(culprit.label)) {
-    why.textContent = `${culprit.label} cut it to ${culprit.n.toLocaleString()} words — only ${pool.length} syllables, too few to build from.`
-    why.append(fixButton('loosen it to ≥ 6', () => {
-      state.recipe.rarity = 6
-      renderControls()
-      roll()
-    }))
-  } else if (mode === 'all' && include.length > 1) {
-    why.textContent = `Those ${include.length} authors share only ${first.n.toLocaleString()} words, and ${pool.length} syllables is too few to build from.`
+  // The rarity branch that used to live here is gone: rarity no longer gates
+  // generation (stems come from the set BEFORE the common-English cut), so
+  // offering "loosen it to ≥ 6" would have been a fix button that fixes
+  // nothing. An empty batch now means the chosen books did not yield enough
+  // recognisable whole words.
+  if (mode === 'all' && include.length > 1) {
+    why.textContent = `Those ${include.length} authors share only ${first.n.toLocaleString()} words, and ${stems.heads.length} stems is too few to build from.`
     why.append(fixButton('use ∪ UNION instead', () => {
       state.recipe.mode = 'any'
       renderControls()
       roll()
     }))
   } else {
-    why.textContent = `Only ${pool.length} syllables in this set — too few to build from.`
+    why.textContent = `Only ${stems.heads.length} recognisable stems in this set — too few to build from.`
     why.append(fixButton('start over', resetAll))
   }
   status.append(why)
@@ -585,9 +597,21 @@ const poolFor = () => {
   const hit = state.poolCache.get(key)
   if (hit) return hit
   const stages = selectStages(state.corpus, state.recipe)
+  // Stems are harvested from `afterExclude`, NOT `final`.
+  //
+  // This is forced, and it is worth being loud about. The rarity stage exists
+  // to DROP common English, and common English is exactly what a recognisable
+  // stem is made of -- harvesting from `final` returned literally zero stems
+  // for every recipe, which made every book selection produce an identical
+  // batch. So generation now reads the set after exclusions and before the
+  // rarity cut. Consequence: the rarity control no longer changes the names.
+  // See the report -- the obvious repair is to repoint that control at the
+  // stem document-frequency window instead of deleting it.
   const val = {
     words: countBits(stages.final),
-    pool: syllablePool(state.corpus, stages.final),
+    stems: mineStems(state.corpus, stages.afterExclude, {
+      vet: (w) => legibilityReason(state.corpus, w),
+    }),
     stages,
   }
   state.poolCache.set(key, val)
@@ -607,14 +631,19 @@ const roll = () => {
     return
   }
 
-  const { pool, stages } = poolFor()
+  const { stems, stages } = poolFor()
   state.stages = stages
   renderProof(stages)
   $('traceBox').hidden = true
 
-  const names = generateNames(state.corpus, pool, { count: BATCH, seed: state.seed })
+  const names = generateMorphemeBatch(state.corpus, null, {
+    count: BATCH,
+    seed: state.seed,
+    parts: state.parts,
+    stems,
+  })
 
-  renderStatus(pool, names.length)
+  renderStatus(stems, names.length)
   $('footRecipe').textContent = recipeText()
   writeUrl()
 
@@ -690,6 +719,14 @@ const wire = () => {
     const b = e.target.closest('button')
     if (!b) return
     state.recipe.rarity = Number(b.dataset.rarity)
+    renderControls()
+    roll()
+  }
+
+  $('partsSeg').onclick = (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    state.parts = Number(b.dataset.parts)
     renderControls()
     roll()
   }
